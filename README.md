@@ -1,32 +1,24 @@
 # TinhLinh Programming Language
 
-A modern, statically-typed programming language with Go-like syntax and LLVM backend.
+A flexible programming language with an LLVM backend.
+
+TinhLinh supports both dynamic and static variables:
+
+- `var` for dynamic variables (similar to Python, JavaScript, Ruby)
+- `let` for static variables (similar to C/C++, Java, Go, Zig)
+- `const` for values (and function references) that never change
 
 ## Features
 
 - Static typing with type inference
+- Dynamic variables when you want rapid iteration
 - Module system
 - LLVM-based code generation
 - Self-hosting compiler (in progress)
 
-## Project Structure
-
-```
-TinhLinh/
-├── Compile/           # Compiler implementation
-│   ├── Bytecode/      # Bytecode generation
-│   ├── CodeGen/       # LLVM IR code generation
-│   ├── Module/        # Module management
-│   ├── Parsing/       # Lexer, Parser, AST
-│   └── Compiler.li    # Main compiler entry point
-├── Linh/              # Language runtime
-├── Runtime/           # Runtime support
-└── Tinh/              # Core language features
-```
-
 ## Language Syntax
 
-```tinh
+```li
 // Variables with static typing
 let x: int32 = 42
 let name: str = "TinhLinh"
@@ -62,4 +54,4 @@ See LICENSE file in parent repository.
 
 - Main Repository: [TinhLinhLang](https://github.com/TinhLinhLang)
 - Documentation: Coming soon
-- Website: Coming soon
+- Website: tinhlinhlang.github.io OR linh.kesug.com
