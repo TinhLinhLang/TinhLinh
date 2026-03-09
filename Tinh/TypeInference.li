@@ -1,0 +1,156 @@
+// TinhLinh Type Inference
+// Infers types for expressions and validates type correctness
+
+// Type inference context
+export struct InferenceContext {
+    let type_checker: any     // TypeChecker
+    let expr_types: any       // Map from expr node to Type
+}
+
+func InferenceContext_new(tc: any): InferenceContext {
+    return InferenceContext{tc, ptr_array_new()}
+}
+
+// Store inferred type for an expression
+func InferenceContext_set_type(ctx: InferenceContext, expr: any, type: any) {
+    ptr_array_append(ctx.expr_types, expr)
+    ptr_array_append(ctx.expr_types, type)
+}
+
+// Get inferred type for an expression
+func InferenceContext_get_type(ctx: InferenceContext, expr: any): any {
+    let i: int32 = 0
+    let n: int32 = ptr_array_len(ctx.expr_types)
+    while (i < n) {
+        let stored_expr: any = ptr_array_get(ctx.expr_types, i)
+        if (stored_expr == expr) {
+            return ptr_array_get(ctx.expr_types, i + 1)
+        }
+        i = i + 2
+    }
+    return 0  // Not found
+}
+
+// Infer type for literal expressions
+func infer_literal_type(value: str): any {
+    // Check if it's a number
+    let first_char: int32 = charAt(value, 0)
+    if (first_char >= 48 and first_char <= 57) {
+        // It's a number
+        return Type_new(TYPE_INT32(), "int32")
+    }
+    
+    // Check if it's a boolean
+    if (str_eq(value, "true") or str_eq(value, "false")) {
+        return Type_new(TYPE_BOOL(), "bool")
+    }
+    
+    // Otherwise it's a string
+    return Type_new(TYPE_STR(), "str")
+}
+
+// Infer type for binary operations
+func infer_binary_type(left_type: any, right_type: any, op: str): any {
+    // Arithmetic operators
+    if (str_eq(op, "+") or str_eq(op, "-") or str_eq(op, "*") or str_eq(op, "/")) {
+        // Both operands should be numeric
+        if (Type_is_numeric(left_type) and Type_is_numeric(right_type)) {
+            return left_type  // Return left type (could be int32 or float)
+        }
+        // String concatenation for +
+        if (str_eq(op, "+") and Type_is_str(left_type) and Type_is_str(right_type)) {
+            return Type_new(TYPE_STR(), "str")
+        }
+    }
+    
+    // Comparison operators
+    if (str_eq(op, "==") or str_eq(op, "!=") or 
+        str_eq(op, "<") or str_eq(op, ">") or 
+        str_eq(op, "<=") or str_eq(op, ">=")) {
+        return Type_new(TYPE_BOOL(), "bool")
+    }
+    
+    // Logical operators
+    if (str_eq(op, "and") or str_eq(op, "or")) {
+        return Type_new(TYPE_BOOL(), "bool")
+    }
+    
+    // Unknown
+    return Type_new(TYPE_UNKNOWN(), "")
+}
+
+// Infer type for unary operations
+func infer_unary_type(operand_type: any, op: str): any {
+    if (str_eq(op, "!")) {
+        return Type_new(TYPE_BOOL(), "bool")
+    }
+    if (str_eq(op, "-")) {
+        if (Type_is_numeric(operand_type)) {
+            return operand_type
+        }
+    }
+    return Type_new(TYPE_UNKNOWN(), "")
+}
+
+// Check if type is compatible for assignment
+func types_compatible(target: any, source: any): bool {
+    // Same type
+    if (Type_equals(target, source)) {
+        return true
+    }
+    
+    // Any type accepts anything
+    if (target.kind == TYPE_ANY()) {
+        return true
+    }
+    
+    // Pointer compatibility
+    if (Type_is_ptr(target) and Type_is_ptr(source)) {
+        return true
+    }
+    
+    return false
+}
+
+// Get LLVM type string from Type
+func Type_to_llvm(t: any): str {
+    if (t.kind == TYPE_INT32()) { return "i32" }
+    if (t.kind == TYPE_BOOL()) { return "i1" }
+    if (t.kind == TYPE_FLOAT()) { return "float" }
+    if (t.kind == TYPE_STR()) { return "ptr" }
+    if (t.kind == TYPE_PTR()) { return "ptr" }
+    if (t.kind == TYPE_ANY()) { return "ptr" }
+    if (t.kind == TYPE_VOID()) { return "void" }
+    if (t.kind == TYPE_STRUCT()) { return "ptr" }
+    return "i32"  // Default
+}
+
+// Check if value needs casting
+func needs_cast(from_type: any, to_type: any): bool {
+    if (Type_equals(from_type, to_type)) {
+        return false
+    }
+    
+    // Ptr to i32 or vice versa
+    if (Type_is_ptr(from_type) and Type_is_int(to_type)) {
+        return true
+    }
+    if (Type_is_int(from_type) and Type_is_ptr(to_type)) {
+        return true
+    }
+    
+    return false
+}
+
+// Generate cast instruction
+func generate_cast(from_type: any, to_type: any, value: str): str {
+    if (Type_is_ptr(from_type) and Type_is_int(to_type)) {
+        // ptrtoint
+        return "ptrtoint ptr " + value + " to i32"
+    }
+    if (Type_is_int(from_type) and Type_is_ptr(to_type)) {
+        // inttoptr
+        return "inttoptr i32 " + value + " to ptr"
+    }
+    return value
+}

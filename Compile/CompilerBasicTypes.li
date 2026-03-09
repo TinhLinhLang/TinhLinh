@@ -1,0 +1,86 @@
+// Compiler with Basic Type System
+// Uses basic type checking without advanced features
+
+import "Parsing/Lexer/Lexer.li"
+import "Parsing/Parser/Parser.li"
+import "CodeGen/CodeGen.li"
+import "../Tinh/TypeSystem.li"
+
+func compile_file_basic_types(input_path: str, output_path: str): bool {
+    print("=== TinhLinh Compiler (Basic Type Checking) ===")
+    print("")
+    
+    // Step 1: Read source file
+    print("[1/5] Reading source file...")
+    let content: str = readFile(input_path)
+    if (str_eq(content, "")) {
+        print("Error: Could not read file ", input_path)
+        return false
+    }
+    
+    let total_len: int32 = len(content)
+    print("      File size: ", i32_to_str(total_len), " bytes")
+
+    // Step 2: Lexical analysis
+    print("[2/5] Lexical analysis...")
+    let lexer: Lexer = Lexer_new(content)
+    let tokens: TokenArray = Lexer_scan_tokens(lexer)
+    
+    let t_count: int32 = token_array_len(tokens)
+    print("      Found ", i32_to_str(t_count), " tokens")
+    
+    // Step 3: Parsing
+    print("[3/5] Parsing...")
+    let parser: Parser = Parser_new(tokens)
+    let stmts: any = Parser_parse_program(parser)
+    
+    let count: int32 = ptr_array_len(stmts)
+    print("      Found ", i32_to_str(count), " statements")
+
+    if (count == 0) {
+        print("Error: No statements to compile")
+        return false
+    }
+
+    // Step 4: Basic type checking
+    print("[4/5] Type checking...")
+    let tc: TypeChecker = TypeChecker_new()
+    let type_check_success: bool = TypeChecker_check_program(tc, stmts)
+    
+    if (!type_check_success) {
+        print("")
+        print("Type checking failed:")
+        TypeChecker_print_errors(tc)
+        return false
+    }
+    
+    print("      Type checking passed")
+    
+    // Step 5: Code generation
+    print("[5/5] Code generation...")
+    let cg: CodeGen = CodeGen_new()
+    let ir: str = CodeGen_run(cg, stmts)
+    writeFile(output_path, ir)
+    print("      Generated LLVM IR: ", output_path)
+    
+    print("")
+    print("=== Compilation successful! ===")
+    return true
+}
+
+// Main entry point
+var input: str = "test.li"
+var output: str = "test.ll"
+
+if (tinh_argc() > 1) {
+    input = tinh_argv(1)
+}
+if (tinh_argc() > 2) {
+    output = tinh_argv(2)
+}
+
+var success: bool = compile_file_basic_types(input, output)
+if (!success) {
+    print("Compilation failed!")
+}
+

@@ -1,0 +1,9 @@
+import fs;
+import math;
+import os;
+
+func main() {
+    let Args: array<string> = os.args;
+    let argc: int32 = len(args)
+}
+main();

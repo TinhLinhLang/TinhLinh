@@ -15,6 +15,9 @@
 .vscode/
 *.suo
 *.user
+ARCHITECTURE.md
+COMPLETION_SUMMARY.md
+BUILD.md
 
 # OS
 .DS_Store

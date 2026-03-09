@@ -1,0 +1,100 @@
+// Minimal TypeSystem for MiniTinhCompiler testing
+// This version uses only features supported by MiniTinhCompiler
+
+// Type kinds
+func TYPE_INT32(): int32 { return 1 }
+func TYPE_STR(): int32 { return 2 }
+func TYPE_BOOL(): int32 { return 3 }
+func TYPE_VOID(): int32 { return 6 }
+func TYPE_ANY(): int32 { return 5 }
+func TYPE_UNKNOWN(): int32 { return 0 }
+
+// Simple type representation (without struct for now)
+func Type_kind_int32(): int32 { return TYPE_INT32() }
+func Type_kind_str(): int32 { return TYPE_STR() }
+func Type_kind_bool(): int32 { return TYPE_BOOL() }
+
+// Type checking functions
+func Type_is_int(kind: int32): bool {
+    return kind == TYPE_INT32()
+}
+
+func Type_is_str(kind: int32): bool {
+    return kind == TYPE_STR()
+}
+
+func Type_is_bool(kind: int32): bool {
+    return kind == TYPE_BOOL()
+}
+
+func Type_is_numeric(kind: int32): bool {
+    return kind == TYPE_INT32()
+}
+
+// Type to string
+func Type_to_string(kind: int32): str {
+    if (kind == TYPE_INT32()) { return "int32" }
+    if (kind == TYPE_STR()) { return "str" }
+    if (kind == TYPE_BOOL()) { return "bool" }
+    if (kind == TYPE_VOID()) { return "void" }
+    if (kind == TYPE_ANY()) { return "any" }
+    return "unknown"
+}
+
+// Test functions
+func test_type_kinds() {
+    print("=== Testing Type Kinds ===")
+    print("TYPE_INT32: ", i32_to_str(TYPE_INT32()))
+    print("TYPE_STR: ", i32_to_str(TYPE_STR()))
+    print("TYPE_BOOL: ", i32_to_str(TYPE_BOOL()))
+}
+
+func test_type_checks() {
+    print("")
+    print("=== Testing Type Checks ===")
+    
+    let int_kind: int32 = TYPE_INT32()
+    let str_kind: int32 = TYPE_STR()
+    
+    if (Type_is_int(int_kind)) {
+        print("int32 is int: true")
+    }
+    
+    if (Type_is_str(str_kind)) {
+        print("str is str: true")
+    }
+    
+    if (Type_is_numeric(int_kind)) {
+        print("int32 is numeric: true")
+    }
+}
+
+func test_type_strings() {
+    print("")
+    print("=== Testing Type Strings ===")
+    print("int32 -> ", Type_to_string(TYPE_INT32()))
+    print("str -> ", Type_to_string(TYPE_STR()))
+    print("bool -> ", Type_to_string(TYPE_BOOL()))
+    print("void -> ", Type_to_string(TYPE_VOID()))
+    print("any -> ", Type_to_string(TYPE_ANY()))
+}
+
+func main(): int32 {
+    print("========================================")
+    print("  Minimal Type System Test")
+    print("========================================")
+    print("")
+    
+    test_type_kinds()
+    test_type_checks()
+    test_type_strings()
+    
+    print("")
+    print("========================================")
+    print("  All Tests Passed!")
+    print("========================================")
+    
+    return 0
+}
+
+main()

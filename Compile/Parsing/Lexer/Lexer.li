@@ -2,10 +2,10 @@ import "../AST/AST.li"
 import "TokenKind.li"
 
 export struct Token {
-    var t_kind: int32
-    var t_lexeme: str
-    var t_line: int32
-    var t_col: int32
+    let t_kind: int32
+    let t_lexeme: str
+    let t_line: int32
+    let t_col: int32
 }
 
 func token_new(kind: int32, lexeme: str, line: int32, col: int32): Token {
@@ -18,21 +18,21 @@ func token_line(t: Token): int32 { return t.t_line }
 func token_col(t: Token): int32 { return t.t_col }
 
 export struct TokenArray {
-    var items: any
+    let items: any
 }
 
 export struct Lexer {
-    var l_source: str
-    var l_source_len: int32
-    var l_start: int32
-    var l_current: int32
-    var l_line: int32
-    var l_col: int32
-    var l_tokens: TokenArray
+    let l_source: str
+    let l_source_len: int32
+    let l_start: int32
+    let l_current: int32
+    let l_line: int32
+    let l_col: int32
+    let l_tokens: TokenArray
 }
 
 func Lexer_new(source: str): Lexer {
-    var tokens: TokenArray = TokenArray{ptr_array_new()}
+    let tokens: TokenArray = TokenArray{ptr_array_new()}
     return Lexer{source, len(source), 0, 0, 1, 1, tokens}
 }
 
@@ -51,7 +51,7 @@ func Lexer_peek_next(l: Lexer): int32 {
 }
 
 func Lexer_advance(l: Lexer): int32 {
-    var c: int32 = charAt(l.l_source, l.l_current)
+    let c: int32 = charAt(l.l_source, l.l_current)
     l.l_current = l.l_current + 1
     l.l_col = l.l_col + 1
     return c
@@ -59,7 +59,7 @@ func Lexer_advance(l: Lexer): int32 {
 
 func Lexer_skip_whitespace(l: Lexer) {
     while (!Lexer_at_end(l)) {
-        var c: int32 = Lexer_peek(l)
+        let c: int32 = Lexer_peek(l)
         if (c == 32 or c == 9 or c == 13 or c == 10) {
             if (c == 10) {
                 l.l_line = l.l_line + 1
@@ -102,12 +102,12 @@ func Lexer_scan_token(l: Lexer): Token {
     l.l_start = l.l_current
     if (Lexer_at_end(l)) { return token_new(EOF(), "", l.l_line, l.l_col) }
 
-    var c: int32 = Lexer_advance(l)
+    let c: int32 = Lexer_advance(l)
 
     if (is_alpha(c)) {
         while (is_alphanumeric(Lexer_peek(l))) { Lexer_advance(l) }
-        var text: str = substr(l.l_source, l.l_start, l.l_current - l.l_start)
-        var kind: int32 = IDENTIFIER()
+        let text: str = substr(l.l_source, l.l_start, l.l_current - l.l_start)
+        let kind: int32 = IDENTIFIER()
         if (str_eq(text, "var")) { kind = VAR() }
         else if (str_eq(text, "let")) { kind = LET() }
         else if (str_eq(text, "const")) { kind = CONST() }
@@ -127,7 +127,7 @@ func Lexer_scan_token(l: Lexer): Token {
 
     if (is_digit(c)) {
         while (is_digit(Lexer_peek(l))) { Lexer_advance(l) }
-        var text: str = substr(l.l_source, l.l_start, l.l_current - l.l_start)
+        let text: str = substr(l.l_source, l.l_start, l.l_current - l.l_start)
         return token_new(NUMBER(), text, l.l_line, l.l_col - (l.l_current - l.l_start))
     }
 
@@ -138,7 +138,7 @@ func Lexer_scan_token(l: Lexer): Token {
         }
         if (Lexer_at_end(l)) { return token_new(INVALID(), "Unterminated string", l.l_line, l.l_col) }
         Lexer_advance(l) // closing quote
-        var text: str = substr(l.l_source, l.l_start + 1, l.l_current - l.l_start - 2)
+        let text: str = substr(l.l_source, l.l_start + 1, l.l_current - l.l_start - 2)
         return token_new(STRING(), text, l.l_line, l.l_col - (l.l_current - l.l_start))
     }
 
@@ -178,7 +178,7 @@ func Lexer_scan_token(l: Lexer): Token {
 
 func Lexer_scan_tokens(l: Lexer): TokenArray {
     while (!Lexer_at_end(l)) {
-        var tok: Token = Lexer_scan_token(l)
+        let tok: Token = Lexer_scan_token(l)
         if (tok.t_kind != INVALID()) {
             ptr_array_append(l.l_tokens.items, tok)
         }

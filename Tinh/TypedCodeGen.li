@@ -1,0 +1,253 @@
+// Type-Aware Code Generation
+// Generates LLVM IR with proper type information
+
+import "TypeSystem.li"
+import "TypeInference.li"
+import "TypeChecker.li"
+
+// Enhanced code generator with type tracking
+export struct TypedCodeGen {
+    let codegen: any          // Original CodeGen
+    let type_checker: AdvancedTypeChecker
+    let expr_types: any       // Map from expr to Type
+}
+
+func TypedCodeGen_new(cg: any, atc: AdvancedTypeChecker): TypedCodeGen {
+    return TypedCodeGen{cg, atc, ptr_array_new()}
+}
+
+func TypedCodeGen_set_expr_type(tcg: TypedCodeGen, expr: any, type: Type) {
+    ptr_array_append(tcg.expr_types, expr)
+    ptr_array_append(tcg.expr_types, type)
+}
+
+func TypedCodeGen_get_expr_type(tcg: TypedCodeGen, expr: any): Type {
+    let i: int32 = 0
+    let n: int32 = ptr_array_len(tcg.expr_types)
+    while (i < n) {
+        let stored_expr: any = ptr_array_get(tcg.expr_types, i)
+        if (stored_expr == expr) {
+            return ptr_array_get(tcg.expr_types, i + 1)
+        }
+        i = i + 2
+    }
+    // Fallback: infer type
+    return TypeChecker_infer_expr(tcg.type_checker.type_checker, expr)
+}
+
+// Generate typed expression with proper LLVM types
+func TypedCodeGen_generate_typed_expr(tcg: TypedCodeGen, node: any): str {
+    if (node == 0) { return "0" }
+    
+    let expr_type: Type = TypedCodeGen_get_expr_type(tcg, node)
+    let llvm_type: str = Type_to_llvm(expr_type)
+    
+    // Use original codegen but track types
+    let result: str = CodeGen_generate_expr(tcg.codegen, node)
+    
+    return result
+}
+
+// Generate typed binary operation
+func TypedCodeGen_generate_typed_binary(tcg: TypedCodeGen, node: any): str {
+    let left_type: Type = TypedCodeGen_get_expr_type(tcg, node.left)
+    let right_type: Type = TypedCodeGen_get_expr_type(tcg, node.right)
+    let result_type: Type = infer_binary_type(left_type, right_type, node.value)
+    
+    let left_val: str = TypedCodeGen_generate_typed_expr(tcg, node.left)
+    let right_val: str = TypedCodeGen_generate_typed_expr(tcg, node.right)
+    
+    // Check if cast needed
+    if (needs_cast(left_type, result_type)) {
+        left_val = generate_cast(left_type, result_type, left_val)
+    }
+    if (needs_cast(right_type, result_type)) {
+        right_val = generate_cast(right_type, result_type, right_val)
+    }
+    
+    let res: str = CodeGen_next_temp(tcg.codegen)
+    let llvm_type: str = Type_to_llvm(result_type)
+    
+    // Generate appropriate instruction based on types
+    if (str_eq(node.value, "+")) {
+        if (Type_is_numeric(result_type)) {
+            CodeGen_emit(tcg.codegen, res + " = add " + llvm_type + " " + left_val + ", " + right_val)
+        } else {
+            // String concatenation (would need runtime support)
+            CodeGen_emit(tcg.codegen, res + " = call ptr @tinh_str_concat(ptr " + left_val + ", ptr " + right_val + ")")
+        }
+    } else if (str_eq(node.value, "-")) {
+        CodeGen_emit(tcg.codegen, res + " = sub " + llvm_type + " " + left_val + ", " + right_val)
+    } else if (str_eq(node.value, "*")) {
+        CodeGen_emit(tcg.codegen, res + " = mul " + llvm_type + " " + left_val + ", " + right_val)
+    } else if (str_eq(node.value, "/")) {
+        if (result_type.kind == TYPE_FLOAT()) {
+            CodeGen_emit(tcg.codegen, res + " = fdiv " + llvm_type + " " + left_val + ", " + right_val)
+        } else {
+            CodeGen_emit(tcg.codegen, res + " = sdiv " + llvm_type + " " + left_val + ", " + right_val)
+        }
+    } else if (str_eq(node.value, "==")) {
+        if (Type_is_ptr(left_type)) {
+            CodeGen_emit(tcg.codegen, res + " = icmp eq ptr " + left_val + ", " + right_val)
+        } else {
+            CodeGen_emit(tcg.codegen, res + " = icmp eq " + llvm_type + " " + left_val + ", " + right_val)
+        }
+    } else if (str_eq(node.value, "!=")) {
+        CodeGen_emit(tcg.codegen, res + " = icmp ne " + llvm_type + " " + left_val + ", " + right_val)
+    } else if (str_eq(node.value, "<")) {
+        CodeGen_emit(tcg.codegen, res + " = icmp slt " + llvm_type + " " + left_val + ", " + right_val)
+    } else if (str_eq(node.value, "<=")) {
+        CodeGen_emit(tcg.codegen, res + " = icmp sle " + llvm_type + " " + left_val + ", " + right_val)
+    } else if (str_eq(node.value, ">")) {
+        CodeGen_emit(tcg.codegen, res + " = icmp sgt " + llvm_type + " " + left_val + ", " + right_val)
+    } else if (str_eq(node.value, ">=")) {
+        CodeGen_emit(tcg.codegen, res + " = icmp sge " + llvm_type + " " + left_val + ", " + right_val)
+    }
+    
+    return res
+}
+
+// Generate typed function call
+func TypedCodeGen_generate_typed_call(tcg: TypedCodeGen, node: any): str {
+    let sig: FunctionSignature = AdvancedTypeChecker_lookup_function(tcg.type_checker, node.name)
+    
+    let n: int32 = ptr_array_len(node.args)
+    let i: int32 = 0
+    let arg_vals: any = ptr_array_new()
+    let arg_types: any = ptr_array_new()
+    
+    // Generate arguments with types
+    while (i < n) {
+        let arg: any = ptr_array_get(node.args, i)
+        let arg_val: str = TypedCodeGen_generate_typed_expr(tcg, arg)
+        let arg_type: Type = TypedCodeGen_get_expr_type(tcg, arg)
+        
+        ptr_array_append(arg_vals, arg_val)
+        ptr_array_append(arg_types, arg_type)
+        i = i + 1
+    }
+    
+    // Build argument string with proper types
+    let args_str: str = ""
+    i = 0
+    while (i < n) {
+        let val: str = ptr_array_get(arg_vals, i)
+        let type: Type = ptr_array_get(arg_types, i)
+        let llvm_type: str = Type_to_llvm(type)
+        
+        if (i > 0) { args_str = args_str + ", " }
+        args_str = args_str + llvm_type + " " + val
+        i = i + 1
+    }
+    
+    // Determine return type
+    let ret_type: Type = Type_new(TYPE_INT32(), "int32")
+    if (sig != 0) {
+        ret_type = sig.return_type
+    } else {
+        // Built-in functions
+        ret_type = TypedCodeGen_get_expr_type(tcg, node)
+    }
+    
+    let ret_llvm: str = Type_to_llvm(ret_type)
+    
+    if (ret_type.kind == TYPE_VOID()) {
+        CodeGen_emit(tcg.codegen, "call void @" + node.name + "(" + args_str + ")")
+        return "0"
+    } else {
+        let res: str = CodeGen_next_temp(tcg.codegen)
+        CodeGen_emit(tcg.codegen, res + " = call " + ret_llvm + " @" + node.name + "(" + args_str + ")")
+        return res
+    }
+}
+
+// Generate typed variable declaration
+func TypedCodeGen_generate_typed_var_decl(tcg: TypedCodeGen, node: any) {
+    let var_type: Type = Type_new(TYPE_INT32(), "int32")
+    
+    if (!str_eq(node.ty_name, "")) {
+        if (str_eq(node.ty_name, "str")) {
+            var_type = Type_new(TYPE_STR(), "str")
+        } else if (str_eq(node.ty_name, "bool")) {
+            var_type = Type_new(TYPE_BOOL(), "bool")
+        } else if (str_eq(node.ty_name, "float")) {
+            var_type = Type_new(TYPE_FLOAT(), "float")
+        } else if (str_eq(node.ty_name, "any")) {
+            var_type = Type_new(TYPE_ANY(), "any")
+        } else {
+            var_type = Type_new(TYPE_STRUCT(), node.ty_name)
+        }
+    }
+    
+    let llvm_type: str = Type_to_llvm(var_type)
+    CodeGen_emit(tcg.codegen, "%" + node.name + " = alloca " + llvm_type)
+    
+    if (node.initializer != 0) {
+        let val: str = TypedCodeGen_generate_typed_expr(tcg, node.initializer)
+        let init_type: Type = TypedCodeGen_get_expr_type(tcg, node.initializer)
+        
+        // Cast if needed
+        if (needs_cast(init_type, var_type)) {
+            val = generate_cast(init_type, var_type, val)
+        }
+        
+        CodeGen_emit(tcg.codegen, "store " + llvm_type + " " + val + ", ptr %" + node.name)
+    }
+}
+
+// Type-aware optimization hints
+func TypedCodeGen_can_optimize_comparison(tcg: TypedCodeGen, node: any): bool {
+    if (node.n_kind != EXPR_BINARY()) { return false }
+    
+    let left_type: Type = TypedCodeGen_get_expr_type(tcg, node.left)
+    let right_type: Type = TypedCodeGen_get_expr_type(tcg, node.right)
+    
+    // Can optimize if both are same primitive type
+    if (Type_equals(left_type, right_type)) {
+        if (Type_is_int(left_type) or Type_is_bool(left_type)) {
+            return true
+        }
+    }
+    
+    return false
+}
+
+// Generate optimized code based on type information
+func TypedCodeGen_optimize_expr(tcg: TypedCodeGen, node: any): str {
+    if (node == 0) { return "0" }
+    
+    let kind: int32 = node.n_kind
+    
+    // Constant folding for literals
+    if (kind == EXPR_BINARY()) {
+        if (node.left.n_kind == EXPR_LITERAL() and node.right.n_kind == EXPR_LITERAL()) {
+            // Both are literals - could fold at compile time
+            // For now, just generate normal code
+        }
+        
+        // Use optimized comparison if possible
+        if (TypedCodeGen_can_optimize_comparison(tcg, node)) {
+            return TypedCodeGen_generate_typed_binary(tcg, node)
+        }
+    }
+    
+    return TypedCodeGen_generate_typed_expr(tcg, node)
+}
+
+// Integration point: replace CodeGen with TypedCodeGen
+func TypedCodeGen_run(tcg: TypedCodeGen, ast: any): str {
+    // First, run type checking
+    let success: bool = AdvancedTypeChecker_check_program(tcg.type_checker, ast)
+    
+    if (!success) {
+        print("Type checking failed, aborting code generation")
+        AdvancedTypeChecker_print_results(tcg.type_checker)
+        return ""
+    }
+    
+    print("Type checking passed")
+    
+    // Then generate code using original CodeGen
+    // (In full implementation, would use typed generation)
+    return CodeGen_run(tcg.codegen, ast)
+}

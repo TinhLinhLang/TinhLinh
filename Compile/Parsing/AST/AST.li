@@ -20,24 +20,24 @@ func STMT_IMPORT(): int32 { return 18 }
 func STMT_RETURN(): int32 { return 19 }
 
 export struct ASTNode {
-    var n_kind: int32
-    var n_line: int32
-    var n_col: int32
-    var name: str
-    var value: str
-    var ty_name: str
-    var initializer: ASTNode
-    var left: ASTNode
-    var right: ASTNode
-    var body: ASTNode
-    var else_branch: ASTNode
-    var condition: ASTNode
-    var args: any
-    var params: any
-    var fields: any
-    var members: any
-    var member_of: str
-    var is_exported: bool
+    let n_kind: int32
+    let n_line: int32
+    let n_col: int32
+    let name: str
+    let value: str
+    let ty_name: str
+    let initializer: ASTNode
+    let left: ASTNode
+    let right: ASTNode
+    let body: ASTNode
+    let else_branch: ASTNode
+    let condition: ASTNode
+    let args: any
+    let params: any
+    let fields: any
+    let members: any
+    let member_of: str
+    let is_exported: bool
 }
 
 func AST_node_new(kind: int32, line: int32, col: int32): ASTNode {
@@ -45,12 +45,13 @@ func AST_node_new(kind: int32, line: int32, col: int32): ASTNode {
 }
 
 func str_eq(a: str, b: str): bool {
-    var n: int32 = len(a)
+    let n: int32 = len(a)
     if (n != len(b)) { return false }
-    var i: int32 = 0
+    let i: int32 = 0
     while (i < n) {
         if (charAt(a, i) != charAt(b, i)) { return false }
         i = i + 1
     }
     return true
 }
+

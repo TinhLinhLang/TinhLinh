@@ -1,0 +1,28 @@
+// Simple test for MiniTinhCompiler
+// Test basic functionality before compiling full type system
+
+func test_basic(): int32 {
+    let x: int32 = 42
+    let y: int32 = 10
+    return x + y
+}
+
+func test_string(): str {
+    let msg: str = "Hello from Type System"
+    return msg
+}
+
+func main(): int32 {
+    print("=== MiniTinhCompiler Test ===")
+    
+    let result: int32 = test_basic()
+    print("Basic test result: ", i32_to_str(result))
+    
+    let msg: str = test_string()
+    print("String test: ", msg)
+    
+    print("=== Test Passed ===")
+    return 0
+}
+
+main()

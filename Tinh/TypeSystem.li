@@ -1,0 +1,405 @@
+// TinhLinh Type System
+// Provides type checking and type inference for the compiler
+
+// Type kinds
+func TYPE_INT32(): int32 { return 1 }
+func TYPE_STR(): int32 { return 2 }
+func TYPE_BOOL(): int32 { return 3 }
+func TYPE_FLOAT(): int32 { return 4 }
+func TYPE_ANY(): int32 { return 5 }
+func TYPE_VOID(): int32 { return 6 }
+func TYPE_PTR(): int32 { return 7 }
+func TYPE_STRUCT(): int32 { return 8 }
+func TYPE_FUNCTION(): int32 { return 9 }
+func TYPE_UNKNOWN(): int32 { return 0 }
+
+// Type representation
+export struct Type {
+    let kind: int32           // Type kind (TYPE_INT32, TYPE_STR, etc.)
+    let name: str             // Type name for structs/custom types
+    let is_pointer: bool      // Is this a pointer type?
+    let element_type: Type    // For arrays/pointers
+    let return_type: Type     // For functions
+    let param_types: any      // Array of parameter types for functions
+}
+
+func Type_new(kind: int32, name: str): Type {
+    return Type{kind, name, false, 0, 0, 0}
+}
+
+func Type_new_ptr(base: Type): Type {
+    let t: Type = Type{TYPE_PTR(), "", true, base, 0, 0}
+    return t
+}
+
+func Type_is_int(t: Type): bool {
+    return t.kind == TYPE_INT32()
+}
+
+func Type_is_str(t: Type): bool {
+    return t.kind == TYPE_STR()
+}
+
+func Type_is_bool(t: Type): bool {
+    return t.kind == TYPE_BOOL()
+}
+
+func Type_is_ptr(t: Type): bool {
+    return t.is_pointer or t.kind == TYPE_PTR() or t.kind == TYPE_STR() or t.kind == TYPE_ANY()
+}
+
+func Type_is_numeric(t: Type): bool {
+    return t.kind == TYPE_INT32() or t.kind == TYPE_FLOAT()
+}
+
+func Type_equals(a: Type, b: Type): bool {
+    if (a.kind != b.kind) { return false }
+    if (a.kind == TYPE_STRUCT()) {
+        return str_eq(a.name, b.name)
+    }
+    return true
+}
+
+func Type_to_string(t: Type): str {
+    if (t.kind == TYPE_INT32()) { return "int32" }
+    if (t.kind == TYPE_STR()) { return "str" }
+    if (t.kind == TYPE_BOOL()) { return "bool" }
+    if (t.kind == TYPE_FLOAT()) { return "float" }
+    if (t.kind == TYPE_ANY()) { return "any" }
+    if (t.kind == TYPE_VOID()) { return "void" }
+    if (t.kind == TYPE_PTR()) { return "ptr" }
+    if (t.kind == TYPE_STRUCT()) { return t.name }
+    return "unknown"
+}
+
+// Symbol table entry
+export struct Symbol {
+    let name: str
+    let type: Type
+    let is_function: bool
+    let is_global: bool
+}
+
+func Symbol_new(name: str, type: Type): Symbol {
+    return Symbol{name, type, false, false}
+}
+
+// Symbol table
+export struct SymbolTable {
+    let symbols: any          // Array of Symbol
+    let parent: SymbolTable   // Parent scope
+}
+
+func SymbolTable_new(parent: SymbolTable): SymbolTable {
+    return SymbolTable{ptr_array_new(), parent}
+}
+
+func SymbolTable_define(table: SymbolTable, name: str, type: Type) {
+    let sym: Symbol = Symbol_new(name, type)
+    ptr_array_append(table.symbols, sym)
+}
+
+func SymbolTable_lookup(table: SymbolTable, name: str): Symbol {
+    // Search in current scope
+    let i: int32 = 0
+    let n: int32 = ptr_array_len(table.symbols)
+    while (i < n) {
+        let sym: Symbol = ptr_array_get(table.symbols, i)
+        if (str_eq(sym.name, name)) {
+            return sym
+        }
+        i = i + 1
+    }
+    
+    // Search in parent scope
+    if (table.parent != 0) {
+        return SymbolTable_lookup(table.parent, name)
+    }
+    
+    // Not found
+    return Symbol{"", Type{TYPE_UNKNOWN(), "", false, 0, 0, 0}, false, false}
+}
+
+// Type checker
+export struct TypeChecker {
+    let current_scope: SymbolTable
+    let global_scope: SymbolTable
+    let errors: any           // Array of error messages
+}
+
+func TypeChecker_new(): TypeChecker {
+    let global: SymbolTable = SymbolTable_new(0)
+    return TypeChecker{global, global, ptr_array_new()}
+}
+
+func TypeChecker_enter_scope(tc: TypeChecker) {
+    let new_scope: SymbolTable = SymbolTable_new(tc.current_scope)
+    tc.current_scope = new_scope
+}
+
+func TypeChecker_exit_scope(tc: TypeChecker) {
+    if (tc.current_scope.parent != 0) {
+        tc.current_scope = tc.current_scope.parent
+    }
+}
+
+func TypeChecker_error(tc: TypeChecker, msg: str) {
+    ptr_array_append(tc.errors, msg)
+}
+
+func TypeChecker_has_errors(tc: TypeChecker): bool {
+    return ptr_array_len(tc.errors) > 0
+}
+
+// Type inference for expressions
+func TypeChecker_infer_expr(tc: TypeChecker, node: any): Type {
+    if (node == 0) {
+        return Type{TYPE_UNKNOWN(), "", false, 0, 0, 0}
+    }
+    
+    let kind: int32 = node.n_kind
+    
+    // Literal
+    if (kind == EXPR_LITERAL()) {
+        if (str_eq(node.value, "true") or str_eq(node.value, "false")) {
+            return Type_new(TYPE_BOOL(), "bool")
+        }
+        if (is_numeric(node.value)) {
+            return Type_new(TYPE_INT32(), "int32")
+        }
+        return Type_new(TYPE_STR(), "str")
+    }
+    
+    // Variable
+    if (kind == EXPR_VARIABLE()) {
+        let sym: Symbol = SymbolTable_lookup(tc.current_scope, node.name)
+        if (sym.type.kind != TYPE_UNKNOWN()) {
+            return sym.type
+        }
+        TypeChecker_error(tc, "Undefined variable: " + node.name)
+        return Type{TYPE_UNKNOWN(), "", false, 0, 0, 0}
+    }
+    
+    // Binary operation
+    if (kind == EXPR_BINARY()) {
+        let left_type: Type = TypeChecker_infer_expr(tc, node.left)
+        let right_type: Type = TypeChecker_infer_expr(tc, node.right)
+        return infer_binary_type(left_type, right_type, node.value)
+    }
+    
+    // Unary operation
+    if (kind == EXPR_UNARY()) {
+        let operand_type: Type = TypeChecker_infer_expr(tc, node.right)
+        return infer_unary_type(operand_type, node.value)
+    }
+    
+    // Function call
+    if (kind == EXPR_CALL()) {
+        let sym: Symbol = SymbolTable_lookup(tc.current_scope, node.name)
+        if (sym.is_function and sym.type.return_type != 0) {
+            return sym.type.return_type
+        }
+        // Built-in functions
+        if (str_eq(node.name, "len") or str_eq(node.name, "charAt")) {
+            return Type_new(TYPE_INT32(), "int32")
+        }
+        if (str_eq(node.name, "substr") or str_eq(node.name, "readFile") or str_eq(node.name, "i32_to_str")) {
+            return Type_new(TYPE_STR(), "str")
+        }
+        if (str_eq(node.name, "str_eq")) {
+            return Type_new(TYPE_BOOL(), "bool")
+        }
+        if (str_eq(node.name, "ptr_array_new") or str_eq(node.name, "ptr_array_get")) {
+            return Type_new(TYPE_ANY(), "any")
+        }
+        return Type_new(TYPE_VOID(), "void")
+    }
+    
+    // Field access
+    if (kind == EXPR_FIELD()) {
+        // For now, assume int32
+        return Type_new(TYPE_INT32(), "int32")
+    }
+    
+    // Struct initialization
+    if (kind == EXPR_STRUCT_INIT()) {
+        return Type_new(TYPE_STRUCT(), node.name)
+    }
+    
+    return Type{TYPE_UNKNOWN(), "", false, 0, 0, 0}
+}
+
+// Type checking for statements
+func TypeChecker_check_stmt(tc: TypeChecker, node: any) {
+    if (node == 0) { return }
+    
+    let kind: int32 = node.n_kind
+    
+    // Variable declaration
+    if (kind == STMT_VAR_DECL()) {
+        let var_type: Type = Type_new(TYPE_INT32(), "int32")
+        if (!str_eq(node.ty_name, "")) {
+            if (str_eq(node.ty_name, "int32")) {
+                var_type = Type_new(TYPE_INT32(), "int32")
+            } else if (str_eq(node.ty_name, "str")) {
+                var_type = Type_new(TYPE_STR(), "str")
+            } else if (str_eq(node.ty_name, "bool")) {
+                var_type = Type_new(TYPE_BOOL(), "bool")
+            } else if (str_eq(node.ty_name, "float")) {
+                var_type = Type_new(TYPE_FLOAT(), "float")
+            } else if (str_eq(node.ty_name, "any")) {
+                var_type = Type_new(TYPE_ANY(), "any")
+            } else {
+                var_type = Type_new(TYPE_STRUCT(), node.ty_name)
+            }
+        }
+        
+        // Check initializer type
+        if (node.initializer != 0) {
+            let init_type: Type = TypeChecker_infer_expr(tc, node.initializer)
+            if (!types_compatible(var_type, init_type)) {
+                TypeChecker_error(tc, "Type mismatch in variable " + node.name)
+            }
+        }
+        
+        SymbolTable_define(tc.current_scope, node.name, var_type)
+    }
+    
+    // Expression statement
+    else if (kind == STMT_EXPR()) {
+        TypeChecker_infer_expr(tc, node.left)
+    }
+    
+    // If statement
+    else if (kind == STMT_IF()) {
+        let cond_type: Type = TypeChecker_infer_expr(tc, node.condition)
+        if (!Type_is_bool(cond_type) and cond_type.kind != TYPE_INT32()) {
+            TypeChecker_error(tc, "If condition must be boolean or int32")
+        }
+        TypeChecker_check_stmt(tc, node.body)
+        if (node.else_branch != 0) {
+            TypeChecker_check_stmt(tc, node.else_branch)
+        }
+    }
+    
+    // While statement
+    else if (kind == STMT_WHILE()) {
+        let cond_type: Type = TypeChecker_infer_expr(tc, node.condition)
+        if (!Type_is_bool(cond_type) and cond_type.kind != TYPE_INT32()) {
+            TypeChecker_error(tc, "While condition must be boolean or int32")
+        }
+        TypeChecker_check_stmt(tc, node.body)
+    }
+    
+    // Block statement
+    else if (kind == STMT_BLOCK()) {
+        TypeChecker_enter_scope(tc)
+        let i: int32 = 0
+        let n: int32 = ptr_array_len(node.body)
+        while (i < n) {
+            TypeChecker_check_stmt(tc, ptr_array_get(node.body, i))
+            i = i + 1
+        }
+        TypeChecker_exit_scope(tc)
+    }
+    
+    // Return statement
+    else if (kind == STMT_RETURN()) {
+        if (node.right != 0) {
+            TypeChecker_infer_expr(tc, node.right)
+        }
+    }
+    
+    // Function declaration
+    else if (kind == STMT_FUNC()) {
+        let func_type: Type = Type_new(TYPE_FUNCTION(), node.name)
+        func_type.is_function = true
+        
+        let sym: Symbol = Symbol_new(node.name, func_type)
+        sym.is_function = true
+        SymbolTable_define(tc.global_scope, node.name, func_type)
+        
+        TypeChecker_enter_scope(tc)
+        
+        // Add parameters to scope
+        if (node.params != 0) {
+            let i: int32 = 0
+            let n: int32 = ptr_array_len(node.params)
+            while (i < n) {
+                let param: any = ptr_array_get(node.params, i)
+                let param_type: Type = Type_new(TYPE_INT32(), "int32")
+                SymbolTable_define(tc.current_scope, param.name, param_type)
+                i = i + 1
+            }
+        }
+        
+        // Check function body
+        if (node.body != 0) {
+            TypeChecker_check_stmt(tc, node.body)
+        }
+        
+        TypeChecker_exit_scope(tc)
+    }
+}
+
+// Main type checking entry point
+func TypeChecker_check_program(tc: TypeChecker, ast: any): bool {
+    // Initialize built-in types
+    SymbolTable_define(tc.global_scope, "int32", Type_new(TYPE_INT32(), "int32"))
+    SymbolTable_define(tc.global_scope, "str", Type_new(TYPE_STR(), "str"))
+    SymbolTable_define(tc.global_scope, "bool", Type_new(TYPE_BOOL(), "bool"))
+    SymbolTable_define(tc.global_scope, "float", Type_new(TYPE_FLOAT(), "float"))
+    SymbolTable_define(tc.global_scope, "any", Type_new(TYPE_ANY(), "any"))
+    
+    // Check all statements in AST
+    if (ast != 0) {
+        let i: int32 = 0
+        let n: int32 = ptr_array_len(ast)
+        while (i < n) {
+            TypeChecker_check_stmt(tc, ptr_array_get(ast, i))
+            i = i + 1
+        }
+    }
+    
+    return !TypeChecker_has_errors(tc)
+}
+
+// Print all type errors
+func TypeChecker_print_errors(tc: TypeChecker) {
+    let i: int32 = 0
+    let n: int32 = ptr_array_len(tc.errors)
+    while (i < n) {
+        let msg: str = ptr_array_get(tc.errors, i)
+        print("Type Error: " + msg)
+        i = i + 1
+    }
+}
+
+// Helper function to check if string is numeric
+func is_numeric(s: str): bool {
+    if (len(s) == 0) { return false }
+    let c: int32 = charAt(s, 0)
+    return c >= 48 and c <= 57
+}
+
+// AST node kind constants (must match AST.li)
+func EXPR_LITERAL(): int32 { return 1 }
+func EXPR_VARIABLE(): int32 { return 2 }
+func EXPR_BINARY(): int32 { return 3 }
+func EXPR_UNARY(): int32 { return 4 }
+func EXPR_CALL(): int32 { return 5 }
+func EXPR_FIELD(): int32 { return 6 }
+func EXPR_STRUCT_INIT(): int32 { return 7 }
+func EXPR_ASSIGN(): int32 { return 8 }
+func EXPR_SET_FIELD(): int32 { return 9 }
+
+func STMT_VAR_DECL(): int32 { return 10 }
+func STMT_EXPR(): int32 { return 11 }
+func STMT_IF(): int32 { return 12 }
+func STMT_WHILE(): int32 { return 13 }
+func STMT_BLOCK(): int32 { return 14 }
+func STMT_RETURN(): int32 { return 15 }
+func STMT_FUNC(): int32 { return 16 }
+func STMT_STRUCT(): int32 { return 17 }
+func STMT_IMPORT(): int32 { return 18 }
+func STMT_ENUM(): int32 { return 19 }

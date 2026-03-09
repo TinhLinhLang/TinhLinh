@@ -1,0 +1,89 @@
+// Simple type tracking for CodeGen
+
+export struct TypeInfo {
+    let var_types: any      // Map variable name -> type
+    let func_sigs: any      // Map function name -> signature
+}
+
+func TypeInfo_new(): TypeInfo {
+    return TypeInfo{ptr_array_new(), ptr_array_new()}
+}
+
+// Variable type tracking
+func TypeInfo_set_var_type(ti: TypeInfo, name: str, ty: str) {
+    ptr_array_append(ti.var_types, name)
+    ptr_array_append(ti.var_types, ty)
+}
+
+func TypeInfo_get_var_type(ti: TypeInfo, name: str): str {
+    let n: int32 = ptr_array_len(ti.var_types)
+    let i: int32 = 0
+    while (i < n) {
+        let vname: str = ptr_array_get(ti.var_types, i)
+        if (str_eq(vname, name)) {
+            return ptr_array_get(ti.var_types, i + 1)
+        }
+        i = i + 2
+    }
+    return "i32"  // Default
+}
+
+// Function signature tracking
+func TypeInfo_set_func_sig(ti: TypeInfo, name: str, ret_ty: str, param_types: str) {
+    ptr_array_append(ti.func_sigs, name)
+    ptr_array_append(ti.func_sigs, ret_ty)
+    ptr_array_append(ti.func_sigs, param_types)
+}
+
+func TypeInfo_get_func_ret_type(ti: TypeInfo, name: str): str {
+    let n: int32 = ptr_array_len(ti.func_sigs)
+    let i: int32 = 0
+    while (i < n) {
+        let fname: str = ptr_array_get(ti.func_sigs, i)
+        if (str_eq(fname, name)) {
+            return ptr_array_get(ti.func_sigs, i + 1)
+        }
+        i = i + 3
+    }
+    return "i32"  // Default
+}
+
+func TypeInfo_get_func_param_types(ti: TypeInfo, name: str): str {
+    let n: int32 = ptr_array_len(ti.func_sigs)
+    let i: int32 = 0
+    while (i < n) {
+        let fname: str = ptr_array_get(ti.func_sigs, i)
+        if (str_eq(fname, name)) {
+            return ptr_array_get(ti.func_sigs, i + 2)
+        }
+        i = i + 3
+    }
+    return ""  // Default
+}
+
+// Initialize with runtime functions
+func TypeInfo_init_runtime(ti: TypeInfo) {
+    TypeInfo_set_func_sig(ti, "len", "i32", "p")
+    TypeInfo_set_func_sig(ti, "substr", "ptr", "pii")
+    TypeInfo_set_func_sig(ti, "charAt", "i32", "pi")
+    TypeInfo_set_func_sig(ti, "readFile", "ptr", "p")
+    TypeInfo_set_func_sig(ti, "writeFile", "void", "pp")
+    TypeInfo_set_func_sig(ti, "str_eq", "i1", "pp")
+    TypeInfo_set_func_sig(ti, "i32_to_str", "ptr", "i")
+    TypeInfo_set_func_sig(ti, "ptr_array_new", "ptr", "")
+    TypeInfo_set_func_sig(ti, "ptr_array_append", "void", "pp")
+    TypeInfo_set_func_sig(ti, "ptr_array_len", "i32", "p")
+    TypeInfo_set_func_sig(ti, "ptr_array_get", "ptr", "pi")
+    TypeInfo_set_func_sig(ti, "tinh_println_str", "void", "p")
+    TypeInfo_set_func_sig(ti, "print", "void", "p")
+    TypeInfo_set_func_sig(ti, "tinh_argc", "i32", "")
+    TypeInfo_set_func_sig(ti, "tinh_argv", "ptr", "i")
+}
+
+func get_llvm_type_from_tinh(ty: str): str {
+    if (str_eq(ty, "int32") or str_eq(ty, "bool") or str_eq(ty, "i32") or str_eq(ty, "i1")) { return "i32" }
+    if (str_eq(ty, "str") or str_eq(ty, "any") or str_eq(ty, "ptr")) { return "ptr" }
+    if (str_eq(ty, "void") or str_eq(ty, "")) { return "void" }
+    return "ptr"  // Custom types are pointers
+}
+

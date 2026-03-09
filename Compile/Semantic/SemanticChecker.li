@@ -1,0 +1,207 @@
+import "../Parsing/AST/AST.li"
+
+// Semantic checker for var/let/const enforcement
+export struct SemanticChecker {
+    let var_storage: any    // Map: var_name -> storage_type ("var", "let", "const")
+    let var_types: any      // Map: var_name -> type
+    let errors: any         // Array of error messages
+}
+
+func SemanticChecker_new(): SemanticChecker {
+    return SemanticChecker{ptr_array_new(), ptr_array_new(), ptr_array_new()}
+}
+
+// Register a variable declaration
+func SemanticChecker_declare_var(sc: SemanticChecker, name: str, storage_type: str, ty: str) {
+    ptr_array_append(sc.var_storage, name)
+    ptr_array_append(sc.var_storage, storage_type)
+    
+    ptr_array_append(sc.var_types, name)
+    ptr_array_append(sc.var_types, ty)
+}
+
+// Get storage type of a variable
+func SemanticChecker_get_storage(sc: SemanticChecker, name: str): str {
+    let n: int32 = ptr_array_len(sc.var_storage)
+    let i: int32 = 0
+    while (i < n) {
+        let vname: str = ptr_array_get(sc.var_storage, i)
+        if (str_eq(vname, name)) {
+            return ptr_array_get(sc.var_storage, i + 1)
+        }
+        i = i + 2
+    }
+    return ""
+}
+
+// Get type of a variable
+func SemanticChecker_get_type(sc: SemanticChecker, name: str): str {
+    let n: int32 = ptr_array_len(sc.var_types)
+    let i: int32 = 0
+    while (i < n) {
+        let vname: str = ptr_array_get(sc.var_types, i)
+        if (str_eq(vname, name)) {
+            return ptr_array_get(sc.var_types, i + 1)
+        }
+        i = i + 2
+    }
+    return ""
+}
+
+// Check if assignment is valid
+func SemanticChecker_check_assign(sc: SemanticChecker, name: str, new_type: str): bool {
+    let storage: str = SemanticChecker_get_storage(sc, name)
+    let old_type: str = SemanticChecker_get_type(sc, name)
+    
+    if (str_eq(storage, "")) {
+        ptr_array_append(sc.errors, "Variable '" + name + "' not declared")
+        return false
+    }
+    
+    if (str_eq(storage, "const")) {
+        ptr_array_append(sc.errors, "Cannot assign to const variable '" + name + "'")
+        return false
+    }
+    
+    if (str_eq(storage, "let")) {
+        if (!str_eq(old_type, new_type) and !str_eq(old_type, "") and !str_eq(new_type, "")) {
+            ptr_array_append(sc.errors, "Cannot change type of let variable '" + name + "' from " + old_type + " to " + new_type)
+            return false
+        }
+    }
+    
+    return true
+}
+
+// Add error message
+func SemanticChecker_add_error(sc: SemanticChecker, msg: str) {
+    ptr_array_append(sc.errors, msg)
+}
+
+// Get error count
+func SemanticChecker_error_count(sc: SemanticChecker): int32 {
+    return ptr_array_len(sc.errors)
+}
+
+// Get error message by index
+func SemanticChecker_get_error(sc: SemanticChecker, idx: int32): str {
+    return ptr_array_get(sc.errors, idx)
+}
+
+// Check a statement recursively
+func SemanticChecker_check_stmt(sc: SemanticChecker, node: ASTNode) {
+    if (node == 0) { return }
+    
+    let kind: int32 = node.n_kind
+    
+    if (kind == STMT_VAR_DECL()) {
+        let storage_type: str = node.value
+        let var_type: str = node.ty_name
+        if (str_eq(var_type, "")) { var_type = "inferred" }
+        
+        SemanticChecker_declare_var(sc, node.name, storage_type, var_type)
+        
+        if (node.initializer != 0) {
+            SemanticChecker_check_expr(sc, node.initializer)
+        }
+    }
+    else if (kind == STMT_EXPR()) {
+        SemanticChecker_check_expr(sc, node.left)
+    }
+    else if (kind == STMT_IF()) {
+        SemanticChecker_check_expr(sc, node.condition)
+        SemanticChecker_check_stmt(sc, node.body)
+        if (node.else_branch != 0) {
+            SemanticChecker_check_stmt(sc, node.else_branch)
+        }
+    }
+    else if (kind == STMT_WHILE()) {
+        SemanticChecker_check_expr(sc, node.condition)
+        SemanticChecker_check_stmt(sc, node.body)
+    }
+    else if (kind == STMT_BLOCK()) {
+        let n: int32 = ptr_array_len(node.body)
+        let i: int32 = 0
+        while (i < n) {
+            SemanticChecker_check_stmt(sc, ptr_array_get(node.body, i))
+            i = i + 1
+        }
+    }
+    else if (kind == STMT_RETURN()) {
+        if (node.right != 0) {
+            SemanticChecker_check_expr(sc, node.right)
+        }
+    }
+    else if (kind == STMT_FUNC()) {
+        if (node.body != 0) {
+            SemanticChecker_check_stmt(sc, node.body)
+        }
+    }
+}
+
+// Check an expression recursively
+func SemanticChecker_check_expr(sc: SemanticChecker, node: ASTNode) {
+    if (node == 0) { return }
+    
+    let kind: int32 = node.n_kind
+    
+    if (kind == EXPR_ASSIGN()) {
+        let var_type: str = SemanticChecker_get_type(sc, node.name)
+        
+        if (!SemanticChecker_check_assign(sc, node.name, var_type)) {
+        }
+        
+        if (node.right != 0) {
+            SemanticChecker_check_expr(sc, node.right)
+        }
+    }
+    else if (kind == EXPR_BINARY()) {
+        SemanticChecker_check_expr(sc, node.left)
+        SemanticChecker_check_expr(sc, node.right)
+    }
+    else if (kind == EXPR_UNARY()) {
+        SemanticChecker_check_expr(sc, node.right)
+    }
+    else if (kind == EXPR_CALL()) {
+        let n: int32 = ptr_array_len(node.args)
+        let i: int32 = 0
+        while (i < n) {
+            SemanticChecker_check_expr(sc, ptr_array_get(node.args, i))
+            i = i + 1
+        }
+    }
+    else if (kind == EXPR_FIELD()) {
+        SemanticChecker_check_expr(sc, node.left)
+    }
+    else if (kind == EXPR_SET_FIELD()) {
+        SemanticChecker_check_expr(sc, node.left)
+        SemanticChecker_check_expr(sc, node.right)
+    }
+}
+
+// Check entire program
+func SemanticChecker_check_program(sc: SemanticChecker, stmts: any) {
+    let n: int32 = ptr_array_len(stmts)
+    let i: int32 = 0
+    while (i < n) {
+        SemanticChecker_check_stmt(sc, ptr_array_get(stmts, i))
+        i = i + 1
+    }
+}
+
+// Print all errors
+func SemanticChecker_print_errors(sc: SemanticChecker) {
+    let n: int32 = SemanticChecker_error_count(sc)
+    if (n == 0) {
+        print("No semantic errors found.")
+        return
+    }
+    
+    print("Found ", i32_to_str(n), " semantic error(s):")
+    let i: int32 = 0
+    while (i < n) {
+        print("  - ", SemanticChecker_get_error(sc, i))
+        i = i + 1
+    }
+}
+

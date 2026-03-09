@@ -1,0 +1,361 @@
+// Advanced Type Checker with Full AST Support
+// Provides comprehensive type checking for all language constructs
+
+import "TypeSystem.li"
+import "TypeInference.li"
+
+// Function signature tracking
+export struct FunctionSignature {
+    let name: str
+    let return_type: Type
+    let param_types: any      // Array of Type
+    let param_names: any      // Array of str
+}
+
+func FunctionSignature_new(name: str, ret_type: Type): FunctionSignature {
+    return FunctionSignature{name, ret_type, ptr_array_new(), ptr_array_new()}
+}
+
+func FunctionSignature_add_param(sig: FunctionSignature, name: str, type: Type) {
+    ptr_array_append(sig.param_names, name)
+    ptr_array_append(sig.param_types, type)
+}
+
+func FunctionSignature_param_count(sig: FunctionSignature): int32 {
+    return ptr_array_len(sig.param_names)
+}
+
+func FunctionSignature_get_param_type(sig: FunctionSignature, index: int32): Type {
+    if (index >= 0 and index < ptr_array_len(sig.param_types)) {
+        return ptr_array_get(sig.param_types, index)
+    }
+    return Type{TYPE_UNKNOWN(), "", false, 0, 0, 0}
+}
+
+// Struct field tracking
+export struct StructDefinition {
+    let name: str
+    let field_names: any      // Array of str
+    let field_types: any      // Array of Type
+}
+
+func StructDefinition_new(name: str): StructDefinition {
+    return StructDefinition{name, ptr_array_new(), ptr_array_new()}
+}
+
+func StructDefinition_add_field(def: StructDefinition, name: str, type: Type) {
+    ptr_array_append(def.field_names, name)
+    ptr_array_append(def.field_types, type)
+}
+
+func StructDefinition_get_field_type(def: StructDefinition, field_name: str): Type {
+    let i: int32 = 0
+    let n: int32 = ptr_array_len(def.field_names)
+    while (i < n) {
+        let name: str = ptr_array_get(def.field_names, i)
+        if (str_eq(name, field_name)) {
+            return ptr_array_get(def.field_types, i)
+        }
+        i = i + 1
+    }
+    return Type{TYPE_UNKNOWN(), "", false, 0, 0, 0}
+}
+
+// Enhanced type checker with function and struct tracking
+export struct AdvancedTypeChecker {
+    let type_checker: TypeChecker
+    let functions: any        // Array of FunctionSignature
+    let structs: any          // Array of StructDefinition
+    let current_function: FunctionSignature
+}
+
+func AdvancedTypeChecker_new(): AdvancedTypeChecker {
+    let tc: TypeChecker = TypeChecker_new()
+    return AdvancedTypeChecker{tc, ptr_array_new(), ptr_array_new(), 0}
+}
+
+func AdvancedTypeChecker_register_function(atc: AdvancedTypeChecker, sig: FunctionSignature) {
+    ptr_array_append(atc.functions, sig)
+    
+    // Also register in symbol table
+    let func_type: Type = Type_new(TYPE_FUNCTION(), sig.name)
+    func_type.return_type = sig.return_type
+    func_type.param_types = sig.param_types
+    
+    let sym: Symbol = Symbol_new(sig.name, func_type)
+    sym.is_function = true
+    SymbolTable_define(atc.type_checker.global_scope, sig.name, func_type)
+}
+
+func AdvancedTypeChecker_lookup_function(atc: AdvancedTypeChecker, name: str): FunctionSignature {
+    let i: int32 = 0
+    let n: int32 = ptr_array_len(atc.functions)
+    while (i < n) {
+        let sig: FunctionSignature = ptr_array_get(atc.functions, i)
+        if (str_eq(sig.name, name)) {
+            return sig
+        }
+        i = i + 1
+    }
+    return 0
+}
+
+func AdvancedTypeChecker_register_struct(atc: AdvancedTypeChecker, def: StructDefinition) {
+    ptr_array_append(atc.structs, def)
+    
+    // Register in symbol table
+    let struct_type: Type = Type_new(TYPE_STRUCT(), def.name)
+    SymbolTable_define(atc.type_checker.global_scope, def.name, struct_type)
+}
+
+func AdvancedTypeChecker_lookup_struct(atc: AdvancedTypeChecker, name: str): StructDefinition {
+    let i: int32 = 0
+    let n: int32 = ptr_array_len(atc.structs)
+    while (i < n) {
+        let def: StructDefinition = ptr_array_get(atc.structs, i)
+        if (str_eq(def.name, name)) {
+            return def
+        }
+        i = i + 1
+    }
+    return 0
+}
+
+// Check function call with argument type validation
+func AdvancedTypeChecker_check_call(atc: AdvancedTypeChecker, node: any): Type {
+    let sig: FunctionSignature = AdvancedTypeChecker_lookup_function(atc, node.name)
+    
+    if (sig == 0) {
+        // Check built-in functions
+        if (str_eq(node.name, "len") or str_eq(node.name, "charAt") or 
+            str_eq(node.name, "ptr_array_len") or str_eq(node.name, "tinh_argc")) {
+            return Type_new(TYPE_INT32(), "int32")
+        }
+        if (str_eq(node.name, "substr") or str_eq(node.name, "readFile") or 
+            str_eq(node.name, "i32_to_str") or str_eq(node.name, "tinh_argv")) {
+            return Type_new(TYPE_STR(), "str")
+        }
+        if (str_eq(node.name, "str_eq")) {
+            return Type_new(TYPE_BOOL(), "bool")
+        }
+        if (str_eq(node.name, "ptr_array_new") or str_eq(node.name, "ptr_array_get")) {
+            return Type_new(TYPE_ANY(), "any")
+        }
+        if (str_eq(node.name, "print") or str_eq(node.name, "writeFile") or 
+            str_eq(node.name, "ptr_array_append")) {
+            return Type_new(TYPE_VOID(), "void")
+        }
+        
+        TypeChecker_error(atc.type_checker, "Undefined function: " + node.name)
+        return Type{TYPE_UNKNOWN(), "", false, 0, 0, 0}
+    }
+    
+    // Check argument count
+    let arg_count: int32 = ptr_array_len(node.args)
+    let param_count: int32 = FunctionSignature_param_count(sig)
+    
+    if (arg_count != param_count) {
+        TypeChecker_error(atc.type_checker, "Function " + node.name + " expects " + 
+                         i32_to_str(param_count) + " arguments, got " + i32_to_str(arg_count))
+    }
+    
+    // Check argument types
+    let i: int32 = 0
+    while (i < arg_count and i < param_count) {
+        let arg: any = ptr_array_get(node.args, i)
+        let arg_type: Type = TypeChecker_infer_expr(atc.type_checker, arg)
+        let param_type: Type = FunctionSignature_get_param_type(sig, i)
+        
+        if (!types_compatible(param_type, arg_type)) {
+            TypeChecker_error(atc.type_checker, "Type mismatch in argument " + i32_to_str(i + 1) + 
+                            " of function " + node.name)
+        }
+        i = i + 1
+    }
+    
+    return sig.return_type
+}
+
+// Check struct field access
+func AdvancedTypeChecker_check_field_access(atc: AdvancedTypeChecker, node: any): Type {
+    let base_type: Type = TypeChecker_infer_expr(atc.type_checker, node.left)
+    
+    if (base_type.kind != TYPE_STRUCT()) {
+        TypeChecker_error(atc.type_checker, "Field access on non-struct type")
+        return Type{TYPE_UNKNOWN(), "", false, 0, 0, 0}
+    }
+    
+    let struct_def: StructDefinition = AdvancedTypeChecker_lookup_struct(atc, base_type.name)
+    if (struct_def == 0) {
+        TypeChecker_error(atc.type_checker, "Unknown struct type: " + base_type.name)
+        return Type{TYPE_UNKNOWN(), "", false, 0, 0, 0}
+    }
+    
+    let field_type: Type = StructDefinition_get_field_type(struct_def, node.name)
+    if (field_type.kind == TYPE_UNKNOWN()) {
+        TypeChecker_error(atc.type_checker, "Struct " + base_type.name + " has no field " + node.name)
+    }
+    
+    return field_type
+}
+
+// Check struct initialization
+func AdvancedTypeChecker_check_struct_init(atc: AdvancedTypeChecker, node: any): Type {
+    let struct_def: StructDefinition = AdvancedTypeChecker_lookup_struct(atc, node.name)
+    
+    if (struct_def == 0) {
+        TypeChecker_error(atc.type_checker, "Unknown struct type: " + node.name)
+        return Type{TYPE_UNKNOWN(), "", false, 0, 0, 0}
+    }
+    
+    // Check field count
+    let init_count: int32 = ptr_array_len(node.args)
+    let field_count: int32 = ptr_array_len(struct_def.field_names)
+    
+    if (init_count != field_count) {
+        TypeChecker_error(atc.type_checker, "Struct " + node.name + " expects " + 
+                         i32_to_str(field_count) + " fields, got " + i32_to_str(init_count))
+    }
+    
+    // Check field types
+    let i: int32 = 0
+    while (i < init_count and i < field_count) {
+        let init_expr: any = ptr_array_get(node.args, i)
+        let init_type: Type = TypeChecker_infer_expr(atc.type_checker, init_expr)
+        let field_type: Type = ptr_array_get(struct_def.field_types, i)
+        
+        if (!types_compatible(field_type, init_type)) {
+            let field_name: str = ptr_array_get(struct_def.field_names, i)
+            TypeChecker_error(atc.type_checker, "Type mismatch in field " + field_name + 
+                            " of struct " + node.name)
+        }
+        i = i + 1
+    }
+    
+    return Type_new(TYPE_STRUCT(), node.name)
+}
+
+// Process function declaration
+func AdvancedTypeChecker_process_function(atc: AdvancedTypeChecker, node: any) {
+    // Determine return type
+    let ret_type: Type = Type_new(TYPE_INT32(), "int32")
+    if (!str_eq(node.ty_name, "")) {
+        if (str_eq(node.ty_name, "void")) {
+            ret_type = Type_new(TYPE_VOID(), "void")
+        } else if (str_eq(node.ty_name, "str")) {
+            ret_type = Type_new(TYPE_STR(), "str")
+        } else if (str_eq(node.ty_name, "bool")) {
+            ret_type = Type_new(TYPE_BOOL(), "bool")
+        } else if (str_eq(node.ty_name, "float")) {
+            ret_type = Type_new(TYPE_FLOAT(), "float")
+        } else if (str_eq(node.ty_name, "any")) {
+            ret_type = Type_new(TYPE_ANY(), "any")
+        } else {
+            ret_type = Type_new(TYPE_STRUCT(), node.ty_name)
+        }
+    }
+    
+    let sig: FunctionSignature = FunctionSignature_new(node.name, ret_type)
+    
+    // Process parameters
+    if (node.params != 0) {
+        let i: int32 = 0
+        let n: int32 = ptr_array_len(node.params)
+        while (i < n) {
+            let param: any = ptr_array_get(node.params, i)
+            let param_type: Type = Type_new(TYPE_INT32(), "int32")
+            
+            if (!str_eq(param.ty_name, "")) {
+                if (str_eq(param.ty_name, "str")) {
+                    param_type = Type_new(TYPE_STR(), "str")
+                } else if (str_eq(param.ty_name, "bool")) {
+                    param_type = Type_new(TYPE_BOOL(), "bool")
+                } else if (str_eq(param.ty_name, "float")) {
+                    param_type = Type_new(TYPE_FLOAT(), "float")
+                } else if (str_eq(param.ty_name, "any")) {
+                    param_type = Type_new(TYPE_ANY(), "any")
+                } else {
+                    param_type = Type_new(TYPE_STRUCT(), param.ty_name)
+                }
+            }
+            
+            FunctionSignature_add_param(sig, param.name, param_type)
+            i = i + 1
+        }
+    }
+    
+    AdvancedTypeChecker_register_function(atc, sig)
+    atc.current_function = sig
+}
+
+// Process struct declaration
+func AdvancedTypeChecker_process_struct(atc: AdvancedTypeChecker, node: any) {
+    let def: StructDefinition = StructDefinition_new(node.name)
+    
+    if (node.fields != 0) {
+        let i: int32 = 0
+        let n: int32 = ptr_array_len(node.fields)
+        while (i < n) {
+            let field: any = ptr_array_get(node.fields, i)
+            let field_type: Type = Type_new(TYPE_INT32(), "int32")
+            
+            if (!str_eq(field.ty_name, "")) {
+                if (str_eq(field.ty_name, "str")) {
+                    field_type = Type_new(TYPE_STR(), "str")
+                } else if (str_eq(field.ty_name, "bool")) {
+                    field_type = Type_new(TYPE_BOOL(), "bool")
+                } else if (str_eq(field.ty_name, "float")) {
+                    field_type = Type_new(TYPE_FLOAT(), "float")
+                } else if (str_eq(field.ty_name, "any")) {
+                    field_type = Type_new(TYPE_ANY(), "any")
+                } else {
+                    field_type = Type_new(TYPE_STRUCT(), field.ty_name)
+                }
+            }
+            
+            StructDefinition_add_field(def, field.name, field_type)
+            i = i + 1
+        }
+    }
+    
+    AdvancedTypeChecker_register_struct(atc, def)
+}
+
+// Full program type checking
+func AdvancedTypeChecker_check_program(atc: AdvancedTypeChecker, ast: any): bool {
+    // First pass: collect all function and struct definitions
+    if (ast != 0) {
+        let i: int32 = 0
+        let n: int32 = ptr_array_len(ast)
+        while (i < n) {
+            let node: any = ptr_array_get(ast, i)
+            if (node != 0) {
+                if (node.n_kind == STMT_FUNC()) {
+                    AdvancedTypeChecker_process_function(atc, node)
+                } else if (node.n_kind == STMT_STRUCT()) {
+                    AdvancedTypeChecker_process_struct(atc, node)
+                }
+            }
+            i = i + 1
+        }
+    }
+    
+    // Second pass: type check all statements
+    return TypeChecker_check_program(atc.type_checker, ast)
+}
+
+// Print type checking results
+func AdvancedTypeChecker_print_results(atc: AdvancedTypeChecker) {
+    if (TypeChecker_has_errors(atc.type_checker)) {
+        print("Type checking failed with errors:")
+        TypeChecker_print_errors(atc.type_checker)
+    } else {
+        print("Type checking passed successfully")
+        
+        let func_count: int32 = ptr_array_len(atc.functions)
+        let struct_count: int32 = ptr_array_len(atc.structs)
+        
+        print("Found " + i32_to_str(func_count) + " functions")
+        print("Found " + i32_to_str(struct_count) + " structs")
+    }
+}
