@@ -1,0 +1,65 @@
+func EOF(): int32 { return 0 }
+func IDENTIFIER(): int32 { return 1 }
+func NUMBER(): int32 { return 2 }
+func STRING(): int32 { return 3 }
+func INVALID(): int32 { return 4 }
+
+// Keywords
+func VAR(): int32 { return 10 }
+func LET(): int32 { return 11 }
+func CONST(): int32 { return 12 }
+func FUNC(): int32 { return 13 }
+func IF(): int32 { return 14 }
+func ELSE(): int32 { return 15 }
+func WHILE(): int32 { return 16 }
+func FOR(): int32 { return 17 }
+func RETURN(): int32 { return 18 }
+func STRUCT(): int32 { return 19 }
+func ENUM(): int32 { return 20 }
+func EXPORT(): int32 { return 21 }
+func IMPORT(): int32 { return 22 }
+func BREAK(): int32 { return 23 }
+func CONTINUE(): int32 { return 24 }
+func TRUE(): int32 { return 25 }
+func FALSE(): int32 { return 26 }
+
+// Types
+func INT_KW(): int32 { return 30 }
+func UINT_KW(): int32 { return 31 }
+func STR_KW(): int32 { return 32 }
+func BOOL_KW(): int32 { return 33 }
+func FLOAT_KW(): int32 { return 34 }
+func VOID_KW(): int32 { return 35 }
+func ANY_KW(): int32 { return 36 }
+func BYTE_KW(): int32 { return 37 }
+
+// Punctuation
+func LPAREN(): int32 { return 40 }
+func RPAREN(): int32 { return 41 }
+func LBRACE(): int32 { return 42 }
+func RBRACE(): int32 { return 43 }
+func LBRACKET(): int32 { return 44 }
+func RBRACKET(): int32 { return 45 }
+func COLON(): int32 { return 46 }
+func COMMA(): int32 { return 47 }
+func DOT(): int32 { return 48 }
+func SEMI(): int32 { return 49 }
+
+// Operators
+func ASSIGN(): int32 { return 50 }
+func PLUS(): int32 { return 51 }
+func MINUS(): int32 { return 52 }
+func STAR(): int32 { return 53 }
+func SLASH(): int32 { return 54 }
+func BANG(): int32 { return 55 }
+func EQUAL(): int32 { return 56 }
+func NOT_EQUAL(): int32 { return 57 }
+func LESS(): int32 { return 58 }
+func GREATER(): int32 { return 59 }
+func LESS_EQUAL(): int32 { return 60 }
+func GREATER_EQUAL(): int32 { return 61 }
+func AND(): int32 { return 62 }
+func OR(): int32 { return 63 }
+
+// More keywords
+func SKIP(): int32 { return 70 }

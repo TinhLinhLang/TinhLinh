@@ -1,0 +1,47 @@
+import "Parsing/Lexer/Lexer.li"
+import "Parsing/Parser/Parser.li"
+import "CodeGen/CodeGen.li"
+
+func compile_file(input_path: str, output_path: str): bool {
+    var content: str = readFile(input_path)
+    if (str_eq(content, "")) {
+        print("Error: Could not read file ", input_path)
+        return false
+    }
+
+    var total_len: int32 = len(content)
+    print("File context length: ", i32_to_str(total_len))
+
+    var lexer: Lexer = Lexer_new(content)
+    var tokens: TokenArray = Lexer_scan_tokens(lexer)
+    
+    var t_count: int32 = token_array_len(tokens)
+    print("Lexer found ", i32_to_str(t_count), " tokens.")
+    
+    var parser: Parser = Parser_new(tokens)
+    var stmts: any = Parser_parse_program(parser)
+    
+    var count: int32 = ptr_array_len(stmts)
+    print("Parser found ", i32_to_str(count), " statements.")
+
+    if (count > 0) {
+        var cg: CodeGen = CodeGen_new()
+        var ir: str = CodeGen_run(cg, stmts)
+        writeFile(output_path, ir)
+        print("Generated LLVM IR.")
+    }
+    
+    return true
+}
+
+var input: str = "test.li"
+var output: str = "test.ll"
+
+if (tinh_argc() > 1) {
+    input = tinh_argv(1)
+}
+if (tinh_argc() > 2) {
+    output = tinh_argv(2)
+}
+
+compile_file(input, output)

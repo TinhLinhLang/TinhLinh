@@ -1,0 +1,10 @@
+export struct Token {
+    var kind: int32
+    var lexeme: str
+    var line: int32
+    var col: int32
+}
+
+export func token_new(kind: int32, lexeme: str, line: int32, col: int32): Token {
+    return Token{kind, lexeme, line, col}
+}

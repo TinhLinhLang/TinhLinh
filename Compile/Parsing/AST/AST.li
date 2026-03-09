@@ -1,0 +1,56 @@
+func EXPR_LITERAL(): int32 { return 1 }
+func EXPR_VARIABLE(): int32 { return 2 }
+func EXPR_BINARY(): int32 { return 3 }
+func EXPR_CALL(): int32 { return 4 }
+func EXPR_FIELD(): int32 { return 5 }
+func EXPR_UNARY(): int32 { return 6 }
+func EXPR_ASSIGN(): int32 { return 7 }
+func EXPR_SET_FIELD(): int32 { return 8 }
+func EXPR_STRUCT_INIT(): int32 { return 9 }
+
+func STMT_VAR_DECL(): int32 { return 10 }
+func STMT_EXPR(): int32 { return 11 }
+func STMT_BLOCK(): int32 { return 12 }
+func STMT_IF(): int32 { return 13 }
+func STMT_WHILE(): int32 { return 14 }
+func STMT_FUNC(): int32 { return 15 }
+func STMT_STRUCT(): int32 { return 16 }
+func STMT_ENUM(): int32 { return 17 }
+func STMT_IMPORT(): int32 { return 18 }
+func STMT_RETURN(): int32 { return 19 }
+
+export struct ASTNode {
+    var n_kind: int32
+    var n_line: int32
+    var n_col: int32
+    var name: str
+    var value: str
+    var ty_name: str
+    var initializer: ASTNode
+    var left: ASTNode
+    var right: ASTNode
+    var body: ASTNode
+    var else_branch: ASTNode
+    var condition: ASTNode
+    var args: any
+    var params: any
+    var fields: any
+    var members: any
+    var member_of: str
+    var is_exported: bool
+}
+
+func AST_node_new(kind: int32, line: int32, col: int32): ASTNode {
+    return ASTNode{kind, line, col, "", "", "", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "", false}
+}
+
+func str_eq(a: str, b: str): bool {
+    var n: int32 = len(a)
+    if (n != len(b)) { return false }
+    var i: int32 = 0
+    while (i < n) {
+        if (charAt(a, i) != charAt(b, i)) { return false }
+        i = i + 1
+    }
+    return true
+}

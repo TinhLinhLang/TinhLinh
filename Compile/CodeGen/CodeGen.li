@@ -1,0 +1,351 @@
+import "../Parsing/AST/AST.li"
+
+export struct CodeGen {
+    var output: str
+    var globals: str
+    var temp_count: int32
+    var label_count: int32
+    var string_count: int32
+    var indent: str
+}
+
+func CodeGen_new(): CodeGen {
+    return CodeGen{"", "", 0, 0, 0, "  "}
+}
+
+func CodeGen_next_temp(cg: CodeGen): str {
+    cg.temp_count = cg.temp_count + 1
+    return "%t" + i32_to_str(cg.temp_count)
+}
+
+func CodeGen_next_label(cg: CodeGen): str {
+    cg.label_count = cg.label_count + 1
+    return "L" + i32_to_str(cg.label_count)
+}
+
+func CodeGen_emit(cg: CodeGen, text: str) {
+    cg.output = cg.output + cg.indent + text + "\n"
+}
+
+func CodeGen_emit_raw(cg: CodeGen, text: str) {
+    cg.output = cg.output + text + "\n"
+}
+
+func CodeGen_emit_global(cg: CodeGen, text: str) {
+    cg.globals = cg.globals + text + "\n"
+}
+
+func is_numeric(s: str): bool {
+    if (len(s) == 0) { return false }
+    var c: int32 = charAt(s, 0)
+    return c >= 48 and c <= 57
+}
+
+func get_field_offset(name: str): int32 {
+    // ASTNode
+    if (str_eq(name, "n_kind")) { return 0 }
+    if (str_eq(name, "n_line")) { return 1 }
+    if (str_eq(name, "n_col")) { return 2 }
+    if (str_eq(name, "name")) { return 3 }
+    if (str_eq(name, "value")) { return 4 }
+    if (str_eq(name, "ty_name")) { return 5 }
+    if (str_eq(name, "initializer")) { return 6 }
+    if (str_eq(name, "left")) { return 7 }
+    if (str_eq(name, "right")) { return 8 }
+    if (str_eq(name, "body")) { return 9 }
+    if (str_eq(name, "else_branch")) { return 10 }
+    if (str_eq(name, "condition")) { return 11 }
+    if (str_eq(name, "args")) { return 12 }
+    if (str_eq(name, "params")) { return 13 }
+    if (str_eq(name, "fields")) { return 14 }
+    if (str_eq(name, "members")) { return 15 }
+    if (str_eq(name, "member_of")) { return 16 }
+    if (str_eq(name, "is_exported")) { return 17 }
+
+    // Lexer
+    if (str_eq(name, "l_source")) { return 0 }
+    if (str_eq(name, "l_source_len")) { return 1 }
+    if (str_eq(name, "l_start")) { return 2 }
+    if (str_eq(name, "l_current")) { return 3 }
+    if (str_eq(name, "l_line")) { return 4 }
+    if (str_eq(name, "l_col")) { return 5 }
+    if (str_eq(name, "l_tokens")) { return 6 }
+
+    // Parser
+    if (str_eq(name, "p_tokens")) { return 0 }
+    if (str_eq(name, "p_current")) { return 1 }
+
+    // Token
+    if (str_eq(name, "t_kind")) { return 0 }
+    if (str_eq(name, "t_lexeme")) { return 1 }
+    if (str_eq(name, "t_line")) { return 2 }
+    if (str_eq(name, "t_col")) { return 3 }
+
+    // TokenArray
+    if (str_eq(name, "items")) { return 0 }
+
+    // CodeGen
+    if (str_eq(name, "output")) { return 0 }
+    if (str_eq(name, "globals")) { return 1 }
+    if (str_eq(name, "temp_count")) { return 2 }
+    if (str_eq(name, "label_count")) { return 3 }
+    if (str_eq(name, "string_count")) { return 4 }
+    if (str_eq(name, "indent")) { return 5 }
+
+    return 0
+}
+
+func get_struct_size(name: str): int32 {
+    if (str_eq(name, "ASTNode")) { return 72 }
+    if (str_eq(name, "Lexer")) { return 28 }
+    if (str_eq(name, "Parser")) { return 8 }
+    if (str_eq(name, "Token")) { return 16 }
+    if (str_eq(name, "TokenArray")) { return 4 }
+    if (str_eq(name, "CodeGen")) { return 24 }
+    return 0
+}
+
+func CodeGen_generate_expr(cg: CodeGen, node: ASTNode): str {
+    if (node == 0) { return "0" }
+    
+    var kind: int32 = node.n_kind
+    
+    if (kind == EXPR_LITERAL()) {
+        if (str_eq(node.value, "true")) { return "1" }
+        if (str_eq(node.value, "false")) { return "0" }
+        if (!is_numeric(node.value)) {
+            cg.string_count = cg.string_count + 1
+            var g_name: str = "@.str." + i32_to_str(cg.string_count)
+            var raw: str = node.value
+            var size: int32 = len(raw) + 1
+            CodeGen_emit_global(cg, g_name + " = private unnamed_addr constant [" + i32_to_str(size) + " x i8] c\"" + raw + "\\00\", align 1")
+            var res: str = CodeGen_next_temp(cg)
+            CodeGen_emit(cg, res + " = getelementptr inbounds [" + i32_to_str(size) + " x i8], ptr " + g_name + ", i32 0, i32 0")
+            return res
+        }
+        return node.value
+    }
+    
+    if (kind == EXPR_VARIABLE()) {
+        var res: str = CodeGen_next_temp(cg)
+        CodeGen_emit(cg, res + " = load i32, ptr %" + node.name)
+        return res
+    }
+    
+    if (kind == EXPR_BINARY()) {
+        var lhs: str = CodeGen_generate_expr(cg, node.left)
+        var rhs: str = CodeGen_generate_expr(cg, node.right)
+        var res: str = CodeGen_next_temp(cg)
+        if (str_eq(node.value, "+")) { CodeGen_emit(cg, res + " = add i32 " + lhs + ", " + rhs) }
+        else if (str_eq(node.value, "-")) { CodeGen_emit(cg, res + " = sub i32 " + lhs + ", " + rhs) }
+        else if (str_eq(node.value, "*")) { CodeGen_emit(cg, res + " = mul i32 " + lhs + ", " + rhs) }
+        else if (str_eq(node.value, "==")) { 
+            if (charAt(lhs, 0) == 37) { CodeGen_emit(cg, res + " = icmp eq ptr " + lhs + ", " + rhs) }
+            else { CodeGen_emit(cg, res + " = icmp eq i32 " + lhs + ", " + rhs) }
+        }
+        else if (str_eq(node.value, "!=")) { CodeGen_emit(cg, res + " = icmp ne i32 " + lhs + ", " + rhs) }
+        else if (str_eq(node.value, "<")) { CodeGen_emit(cg, res + " = icmp slt i32 " + lhs + ", " + rhs) }
+        else if (str_eq(node.value, "<=")) { CodeGen_emit(cg, res + " = icmp sle i32 " + lhs + ", " + rhs) }
+        else if (str_eq(node.value, ">")) { CodeGen_emit(cg, res + " = icmp sgt i32 " + lhs + ", " + rhs) }
+        else if (str_eq(node.value, ">=")) { CodeGen_emit(cg, res + " = icmp sge i32 " + lhs + ", " + rhs) }
+        return res
+    }
+
+    if (kind == EXPR_CALL()) {
+        var n: int32 = ptr_array_len(node.args)
+        var i: int32 = 0
+        var arg_res: any = ptr_array_new()
+        while (i < n) {
+            ptr_array_append(arg_res, CodeGen_generate_expr(cg, ptr_array_get(node.args, i)))
+            i = i + 1
+        }
+        
+        var args_str: str = ""
+        i = 0
+        while (i < n) {
+            var val: str = ptr_array_get(arg_res, i)
+            if (i > 0) { args_str = args_str + ", " }
+            if (charAt(val, 0) == 37 or charAt(val, 0) == 64) { args_str = args_str + "ptr " + val }
+            else { args_str = args_str + "i32 " + val }
+            i = i + 1
+        }
+        
+        var actual_name: str = node.name
+        var ret_ty: str = "i32"
+        
+        if (str_eq(node.name, "len")) { actual_name = "tinh_strlen" }
+        else if (str_eq(node.name, "substr")) { actual_name = "tinh_substr"; ret_ty = "ptr" }
+        else if (str_eq(node.name, "charAt")) { actual_name = "tinh_char_at" }
+        else if (str_eq(node.name, "readFile")) { actual_name = "tinh_read_file"; ret_ty = "ptr" }
+        else if (str_eq(node.name, "writeFile")) { actual_name = "tinh_write_file"; ret_ty = "void" }
+        else if (str_eq(node.name, "str_eq")) { actual_name = "tinh_str_eq"; ret_ty = "i1" }
+        else if (str_eq(node.name, "i32_to_str")) { actual_name = "tinh_i32_to_str"; ret_ty = "ptr" }
+        else if (str_eq(node.name, "ptr_array_new")) { actual_name = "ptr_array_new"; ret_ty = "ptr" }
+        else if (str_eq(node.name, "ptr_array_append")) { actual_name = "ptr_array_append"; ret_ty = "void" }
+        else if (str_eq(node.name, "ptr_array_len")) { actual_name = "ptr_array_len" }
+        else if (str_eq(node.name, "ptr_array_get")) { actual_name = "ptr_array_get"; ret_ty = "ptr" }
+        else if (str_eq(node.name, "tinh_println_str")) { actual_name = "tinh_println_str"; ret_ty = "void" }
+        else if (str_eq(node.name, "print")) { actual_name = "tinh_print_str"; ret_ty = "void" }
+        
+        if (str_eq(ret_ty, "void")) {
+            CodeGen_emit(cg, "call void @" + actual_name + "(" + args_str + ")")
+            return "0"
+        } else {
+            var res: str = CodeGen_next_temp(cg)
+            CodeGen_emit(cg, res + " = call " + ret_ty + " @" + actual_name + "(" + args_str + ")")
+            return res
+        }
+    }
+
+    if (kind == EXPR_FIELD()) {
+        var base: str = CodeGen_generate_expr(cg, node.left)
+        var offset: int32 = get_field_offset(node.name)
+        var res_ptr: str = CodeGen_next_temp(cg)
+        CodeGen_emit(cg, res_ptr + " = getelementptr inbounds i32, ptr " + base + ", i32 " + i32_to_str(offset))
+        var res: str = CodeGen_next_temp(cg)
+        CodeGen_emit(cg, res + " = load i32, ptr " + res_ptr)
+        return res
+    }
+
+    if (kind == EXPR_SET_FIELD()) {
+        var base: str = CodeGen_generate_expr(cg, node.left)
+        var offset: int32 = get_field_offset(node.name)
+        var val: str = CodeGen_generate_expr(cg, node.right)
+        var res_ptr: str = CodeGen_next_temp(cg)
+        CodeGen_emit(cg, res_ptr + " = getelementptr inbounds i32, ptr " + base + ", i32 " + i32_to_str(offset))
+        CodeGen_emit(cg, "store i32 " + val + ", ptr " + res_ptr)
+        return val
+    }
+
+    if (kind == EXPR_STRUCT_INIT()) {
+        var size_bytes: int32 = get_struct_size(node.name)
+        var res: str = CodeGen_next_temp(cg)
+        CodeGen_emit(cg, res + " = call ptr @tinh_malloc(i64 " + i32_to_str(size_bytes) + ")")
+        
+        var n: int32 = ptr_array_len(node.args)
+        var i: int32 = 0
+        while (i < n) {
+            var val: str = CodeGen_generate_expr(cg, ptr_array_get(node.args, i))
+            var f_ptr: str = CodeGen_next_temp(cg)
+            CodeGen_emit(cg, f_ptr + " = getelementptr inbounds i32, ptr " + res + ", i32 " + i32_to_str(i))
+            CodeGen_emit(cg, "store i32 " + val + ", ptr " + f_ptr)
+            i = i + 1
+        }
+        return res
+    }
+
+    if (kind == EXPR_ASSIGN()) {
+        var val: str = CodeGen_generate_expr(cg, node.right)
+        CodeGen_emit(cg, "store i32 " + val + ", ptr %" + node.name)
+        return val
+    }
+
+    if (kind == EXPR_UNARY()) {
+        var right: str = CodeGen_generate_expr(cg, node.right)
+        var res: str = CodeGen_next_temp(cg)
+        if (str_eq(node.value, "!")) { CodeGen_emit(cg, res + " = icmp eq i32 " + right + ", 0") }
+        else if (str_eq(node.value, "-")) { CodeGen_emit(cg, res + " = sub i32 0, " + right) }
+        return res
+    }
+
+    return "0"
+}
+
+func CodeGen_generate_stmt(cg: CodeGen, node: ASTNode) {
+    if (node == 0) { return }
+    var kind: int32 = node.n_kind
+    
+    if (kind == STMT_VAR_DECL()) {
+        CodeGen_emit(cg, "%" + node.name + " = alloca i32")
+        if (node.initializer != 0) {
+            var val: str = CodeGen_generate_expr(cg, node.initializer)
+            CodeGen_emit(cg, "store i32 " + val + ", ptr %" + node.name)
+        }
+    }
+    else if (kind == STMT_EXPR()) { CodeGen_generate_expr(cg, node.left) }
+    else if (kind == STMT_IF()) {
+        var cond: str = CodeGen_generate_expr(cg, node.condition)
+        var l1: str = CodeGen_next_label(cg)
+        var l2: str = CodeGen_next_label(cg)
+        var l3: str = CodeGen_next_label(cg)
+        CodeGen_emit(cg, "br i1 " + cond + ", label %" + l1 + ", label %" + l2)
+        CodeGen_emit_raw(cg, l1 + ":")
+        CodeGen_generate_stmt(cg, node.body)
+        CodeGen_emit(cg, "br label %" + l3)
+        CodeGen_emit_raw(cg, l2 + ":")
+        if (node.else_branch != 0) { CodeGen_generate_stmt(cg, node.else_branch) }
+        CodeGen_emit(cg, "br label %" + l3)
+        CodeGen_emit_raw(cg, l3 + ":")
+    }
+    else if (kind == STMT_WHILE()) {
+        var l1: str = CodeGen_next_label(cg)
+        var l2: str = CodeGen_next_label(cg)
+        var l3: str = CodeGen_next_label(cg)
+        CodeGen_emit(cg, "br label %" + l1)
+        CodeGen_emit_raw(cg, l1 + ":")
+        var cond: str = CodeGen_generate_expr(cg, node.condition)
+        CodeGen_emit(cg, "br i1 " + cond + ", label %" + l2 + ", label %" + l3)
+        CodeGen_emit_raw(cg, l2 + ":")
+        CodeGen_generate_stmt(cg, node.body)
+        CodeGen_emit(cg, "br label %" + l1)
+        CodeGen_emit_raw(cg, l3 + ":")
+    }
+    else if (kind == STMT_BLOCK()) {
+        var i: int32 = 0
+        var n: int32 = ptr_array_len(node.body)
+        while (i < n) {
+            CodeGen_generate_stmt(cg, ptr_array_get(node.body, i))
+            i = i + 1
+        }
+    }
+    else if (kind == STMT_RETURN()) {
+        var val: str = CodeGen_generate_expr(cg, node.right)
+        CodeGen_emit(cg, "ret i32 " + val)
+    }
+}
+
+func CodeGen_run(cg: CodeGen, stmts: any): str {
+    cg.output = ""
+    cg.globals = ""
+    cg.temp_count = 0
+    cg.label_count = 0
+    cg.string_count = 0
+    
+    var n: int32 = ptr_array_len(stmts)
+    var i: int32 = 0
+    
+    CodeGen_emit_raw(cg, "define i32 @main(i32 %argc, ptr %argv) {")
+    CodeGen_emit_raw(cg, "entry:")
+    CodeGen_emit(cg, "call void @tinh_runtime_init(i32 %argc, ptr %argv)")
+    
+    i = 0
+    while (i < n) {
+        var node: ASTNode = ptr_array_get(stmts, i)
+        if (node != 0 and node.n_kind != STMT_FUNC() and node.n_kind != STMT_STRUCT() and node.n_kind != STMT_IMPORT() and node.n_kind != STMT_ENUM()) {
+            CodeGen_generate_stmt(cg, node)
+        }
+        i = i + 1
+    }
+    CodeGen_emit(cg, "ret i32 0")
+    CodeGen_emit_raw(cg, "}")
+
+    var ds: str = "declare void @tinh_runtime_init(i32, ptr)\n"
+    ds = ds + "declare void @tinh_println_str(ptr)\n"
+    ds = ds + "declare void @tinh_print_str(ptr)\n"
+    ds = ds + "declare i32 @tinh_strlen(ptr)\n"
+    ds = ds + "declare ptr @tinh_substr(ptr, i32, i32)\n"
+    ds = ds + "declare i32 @tinh_char_at(ptr, i32)\n"
+    ds = ds + "declare ptr @tinh_read_file(ptr)\n"
+    ds = ds + "declare void @tinh_write_file(ptr, ptr)\n"
+    ds = ds + "declare i1 @tinh_str_eq(ptr, ptr)\n"
+    ds = ds + "declare ptr @tinh_i32_to_str(i32)\n"
+    ds = ds + "declare ptr @ptr_array_new()\n"
+    ds = ds + "declare void @ptr_array_append(ptr, ptr)\n"
+    ds = ds + "declare i32 @ptr_array_len(ptr)\n"
+    ds = ds + "declare ptr @ptr_array_get(ptr, i32)\n"
+    ds = ds + "declare i32 @tinh_argc()\n"
+    ds = ds + "declare ptr @tinh_argv(i32)\n"
+    ds = ds + "declare ptr @tinh_malloc(i64)\n\n"
+
+    return ds + cg.globals + "\n" + cg.output
+}

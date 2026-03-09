@@ -1,0 +1,419 @@
+import "../Lexer/TokenKind.li"
+import "../AST/AST.li"
+
+export struct Parser {
+    var p_tokens: any // TokenArray handle
+    var p_current: int32
+}
+
+func Parser_new(tokens: any): Parser {
+    return Parser{tokens, 0}
+}
+
+func Parser_at_end(p: Parser): bool {
+    var tok: any = token_array_get(p.p_tokens, p.p_current)
+    return token_type(tok) == EOF()
+}
+
+func Parser_peek(p: Parser): any {
+    return token_array_get(p.p_tokens, p.p_current)
+}
+
+func Parser_advance(p: Parser): any {
+    if (!Parser_at_end(p)) {
+        p.p_current = p.p_current + 1
+    }
+    return token_array_get(p.p_tokens, p.p_current - 1)
+}
+
+func Parser_check(p: Parser, kind: int32): bool {
+    if (Parser_at_end(p)) { return false }
+    return token_type(Parser_peek(p)) == kind
+}
+
+func Parser_match(p: Parser, kind: int32): bool {
+    if (Parser_check(p, kind)) {
+        Parser_advance(p)
+        return true
+    }
+    return false
+}
+
+func Parser_consume(p: Parser, kind: int32, msg: str): any {
+    if (Parser_check(p, kind)) {
+        return Parser_advance(p)
+    }
+    print("Parser Error: ", msg, " at line ", i32_to_str(token_line(Parser_peek(p))), " col ", i32_to_str(token_col(Parser_peek(p))), " got '", token_lexeme(Parser_peek(p)), "'")
+    return Parser_peek(p)
+}
+
+// Expressions
+
+func Parser_parse_expression(p: Parser): ASTNode {
+    return Parser_parse_assignment(p)
+}
+
+func Parser_parse_primary(p: Parser): ASTNode {
+    var tok: any = Parser_peek(p)
+    var kind_id: int32 = token_type(tok)
+    
+    if (kind_id == NUMBER()) {
+        Parser_advance(p)
+        var n: ASTNode = AST_node_new(EXPR_LITERAL(), token_line(tok), token_col(tok))
+        n.value = token_lexeme(tok)
+        return n
+    }
+    if (kind_id == STRING()) {
+        Parser_advance(p)
+        var n: ASTNode = AST_node_new(EXPR_LITERAL(), token_line(tok), token_col(tok))
+        n.value = token_lexeme(tok)
+        return n
+    }
+    if (kind_id == TRUE()) {
+        Parser_advance(p)
+        var n: ASTNode = AST_node_new(EXPR_LITERAL(), token_line(tok), token_col(tok))
+        n.value = "true"
+        return n
+    }
+    if (kind_id == FALSE()) {
+        Parser_advance(p)
+        var n: ASTNode = AST_node_new(EXPR_LITERAL(), token_line(tok), token_col(tok))
+        n.value = "false"
+        return n
+    }
+    if (kind_id == IDENTIFIER()) {
+        Parser_advance(p)
+        var n: ASTNode = AST_node_new(EXPR_VARIABLE(), token_line(tok), token_col(tok))
+        n.name = token_lexeme(tok)
+        return n
+    }
+    if (kind_id == LPAREN()) {
+        Parser_advance(p)
+        var expr: ASTNode = Parser_parse_expression(p)
+        Parser_consume(p, RPAREN(), "Expected ')' after expression")
+        return expr
+    }
+    
+    print("Parser Error: Unexpected token '", token_lexeme(tok), "' at line ", i32_to_str(token_line(tok)))
+    Parser_advance(p)
+    return AST_node_new(0, 0, 0)
+}
+
+func Parser_parse_call(p: Parser): ASTNode {
+    var expr: ASTNode = Parser_parse_primary(p)
+    while (true) {
+        if (Parser_match(p, LPAREN())) {
+            var args: any = ptr_array_new()
+            if (!Parser_check(p, RPAREN())) {
+                ptr_array_append(args, Parser_parse_expression(p))
+                while (Parser_match(p, COMMA())) {
+                    ptr_array_append(args, Parser_parse_expression(p))
+                }
+            }
+            Parser_consume(p, RPAREN(), "Expected ')' after arguments")
+            var node: ASTNode = AST_node_new(EXPR_CALL(), expr.n_line, expr.n_col)
+            node.left = expr
+            node.args = args
+            expr = node
+        }
+        else if (Parser_match(p, DOT())) {
+            var name: any = Parser_consume(p, IDENTIFIER(), "Expected field name after '.'")
+            var node: ASTNode = AST_node_new(EXPR_FIELD(), expr.n_line, expr.n_col)
+            node.left = expr
+            node.name = token_lexeme(name)
+            expr = node
+        }
+        else if (Parser_match(p, LBRACE())) {
+            var args: any = ptr_array_new()
+            if (!Parser_check(p, RBRACE())) {
+                ptr_array_append(args, Parser_parse_expression(p))
+                while (Parser_match(p, COMMA())) {
+                    ptr_array_append(args, Parser_parse_expression(p))
+                }
+            }
+            Parser_consume(p, RBRACE(), "Expected '}' after struct initializer")
+            var node: ASTNode = AST_node_new(EXPR_STRUCT_INIT(), expr.n_line, expr.n_col)
+            node.name = expr.name
+            node.args = args
+            expr = node
+        }
+        else {
+            break
+        }
+    }
+    return expr
+}
+
+func Parser_parse_unary(p: Parser): ASTNode {
+    if (Parser_match(p, BANG()) or Parser_match(p, MINUS())) {
+        var tok: any = token_array_get(p.p_tokens, p.p_current - 1)
+        var right: ASTNode = Parser_parse_unary(p)
+        var node: ASTNode = AST_node_new(EXPR_UNARY(), token_line(tok), token_col(tok))
+        node.value = token_lexeme(tok)
+        node.right = right
+        return node
+    }
+    return Parser_parse_call(p)
+}
+
+func Parser_parse_mul(p: Parser): ASTNode {
+    var expr: ASTNode = Parser_parse_unary(p)
+    while (Parser_match(p, STAR()) or Parser_match(p, SLASH())) {
+        var tok: any = token_array_get(p.p_tokens, p.p_current - 1)
+        var right: ASTNode = Parser_parse_unary(p)
+        var node: ASTNode = AST_node_new(EXPR_BINARY(), expr.n_line, expr.n_col)
+        node.value = token_lexeme(tok)
+        node.left = expr
+        node.right = right
+        expr = node
+    }
+    return expr
+}
+
+func Parser_parse_add(p: Parser): ASTNode {
+    var expr: ASTNode = Parser_parse_mul(p)
+    while (Parser_match(p, PLUS()) or Parser_match(p, MINUS())) {
+        var tok: any = token_array_get(p.p_tokens, p.p_current - 1)
+        var right: ASTNode = Parser_parse_mul(p)
+        var node: ASTNode = AST_node_new(EXPR_BINARY(), expr.n_line, expr.n_col)
+        node.value = token_lexeme(tok)
+        node.left = expr
+        node.right = right
+        expr = node
+    }
+    return expr
+}
+
+func Parser_parse_comp(p: Parser): ASTNode {
+    var expr: ASTNode = Parser_parse_add(p)
+    while (Parser_match(p, LESS()) or Parser_match(p, GREATER()) or Parser_match(p, LESS_EQUAL()) or Parser_match(p, GREATER_EQUAL())) {
+        var tok: any = token_array_get(p.p_tokens, p.p_current - 1)
+        var right: ASTNode = Parser_parse_add(p)
+        var node: ASTNode = AST_node_new(EXPR_BINARY(), expr.n_line, expr.n_col)
+        node.value = token_lexeme(tok)
+        node.left = expr
+        node.right = right
+        expr = node
+    }
+    return expr
+}
+
+func Parser_parse_eq(p: Parser): ASTNode {
+    var expr: ASTNode = Parser_parse_comp(p)
+    while (Parser_match(p, EQUAL()) or Parser_match(p, NOT_EQUAL())) {
+        var tok: any = token_array_get(p.p_tokens, p.p_current - 1)
+        var right: ASTNode = Parser_parse_comp(p)
+        var node: ASTNode = AST_node_new(EXPR_BINARY(), expr.n_line, expr.n_col)
+        node.value = token_lexeme(tok)
+        node.left = expr
+        node.right = right
+        expr = node
+    }
+    return expr
+}
+
+func Parser_parse_assignment(p: Parser): ASTNode {
+    var expr: ASTNode = Parser_parse_eq(p)
+    if (Parser_match(p, ASSIGN())) {
+        var value: ASTNode = Parser_parse_assignment(p)
+        if (expr.n_kind == EXPR_VARIABLE()) {
+            var node: ASTNode = AST_node_new(EXPR_ASSIGN(), expr.n_line, expr.n_col)
+            node.name = expr.name
+            node.right = value
+            return node
+        }
+        else if (expr.n_kind == EXPR_FIELD()) {
+            var node: ASTNode = AST_node_new(EXPR_SET_FIELD(), expr.n_line, expr.n_col)
+            node.left = expr.left
+            node.name = expr.name
+            node.right = value
+            return node
+        }
+        print("Parser Error: Invalid assignment target at line ", i32_to_str(expr.n_line))
+    }
+    return expr
+}
+
+// Statements
+
+func Parser_parse_block(p: Parser): ASTNode {
+    var tok: any = Parser_consume(p, LBRACE(), "Expected '{' to start block")
+    var stmts: any = ptr_array_new()
+    while (!Parser_check(p, RBRACE()) and !Parser_at_end(p)) {
+        ptr_array_append(stmts, Parser_parse_statement(p))
+    }
+    Parser_consume(p, RBRACE(), "Expected '}' after block")
+    var node: ASTNode = AST_node_new(STMT_BLOCK(), token_line(tok), token_col(tok))
+    node.body = stmts
+    return node
+}
+
+func Parser_parse_if(p: Parser): ASTNode {
+    var tok: any = token_array_get(p.p_tokens, p.p_current - 1)
+    Parser_consume(p, LPAREN(), "Expected '(' after if")
+    var cond: ASTNode = Parser_parse_expression(p)
+    Parser_consume(p, RPAREN(), "Expected ')' after if condition")
+    var then_b: ASTNode = Parser_parse_statement(p)
+    var else_b: any = 0
+    if (Parser_match(p, ELSE())) {
+        else_b = Parser_parse_statement(p)
+    }
+    var node: ASTNode = AST_node_new(STMT_IF(), token_line(tok), token_col(tok))
+    node.condition = cond
+    node.body = then_b
+    node.else_branch = else_b
+    return node
+}
+
+func Parser_parse_while(p: Parser): ASTNode {
+    var tok: any = token_array_get(p.p_tokens, p.p_current - 1)
+    Parser_consume(p, LPAREN(), "Expected '(' after while")
+    var cond: ASTNode = Parser_parse_expression(p)
+    Parser_consume(p, RPAREN(), "Expected ')' after while condition")
+    var body: ASTNode = Parser_parse_statement(p)
+    var node: ASTNode = AST_node_new(STMT_WHILE(), token_line(tok), token_col(tok))
+    node.condition = cond
+    node.body = body
+    return node
+}
+
+func Parser_parse_function(p: Parser, exported: bool): ASTNode {
+    var tok: any = Parser_consume(p, IDENTIFIER(), "Expected function name")
+    Parser_consume(p, LPAREN(), "Expected '(' after function name")
+    var params: any = ptr_array_new()
+    if (!Parser_check(p, RPAREN())) {
+        while (true) {
+            var pn: any = Parser_consume(p, IDENTIFIER(), "Expected parameter name")
+            Parser_consume(p, COLON(), "Expected ':' after parameter name")
+            var pt: any = Parser_consume(p, IDENTIFIER(), "Expected parameter type")
+            var pd: ASTNode = AST_node_new(STMT_VAR_DECL(), token_line(pn), token_col(pn))
+            pd.name = token_lexeme(pn)
+            pd.ty_name = token_lexeme(pt)
+            ptr_array_append(params, pd)
+            if (!Parser_match(p, COMMA())) { break }
+        }
+    }
+    Parser_consume(p, RPAREN(), "Expected ')' after parameters")
+    var ret_ty: str = ""
+    if (Parser_match(p, COLON())) {
+        var rt: any = Parser_consume(p, IDENTIFIER(), "Expected return type")
+        ret_ty = token_lexeme(rt)
+    }
+    var body: ASTNode = Parser_parse_block(p)
+    var node: ASTNode = AST_node_new(STMT_FUNC(), token_line(tok), token_col(tok))
+    node.name = token_lexeme(tok)
+    node.args = params
+    node.ty_name = ret_ty
+    node.body = body
+    node.is_exported = exported
+    return node
+}
+
+func Parser_parse_struct(p: Parser, exported: bool): ASTNode {
+    var tok: any = Parser_consume(p, IDENTIFIER(), "Expected struct name")
+    Parser_consume(p, LBRACE(), "Expected '{' after struct name")
+    var fields: any = ptr_array_new()
+    while (!Parser_check(p, RBRACE()) and !Parser_at_end(p)) {
+        ptr_array_append(fields, Parser_parse_statement(p))
+    }
+    Parser_consume(p, RBRACE(), "Expected '}' after struct body")
+    var node: ASTNode = AST_node_new(STMT_STRUCT(), token_line(tok), token_col(tok))
+    node.name = token_lexeme(tok)
+    node.args = fields
+    node.is_exported = exported
+    return node
+}
+
+func Parser_parse_enum(p: Parser, exported: bool): ASTNode {
+    var tok: any = Parser_consume(p, IDENTIFIER(), "Expected enum name")
+    Parser_consume(p, LBRACE(), "Expected '{' after enum name")
+    var members: any = ptr_array_new()
+    if (!Parser_check(p, RBRACE())) {
+        while (true) {
+            var m: any = Parser_consume(p, IDENTIFIER(), "Expected member name")
+            ptr_array_append(members, token_lexeme(m))
+            if (!Parser_match(p, COMMA())) { break }
+        }
+    }
+    Parser_consume(p, RBRACE(), "Expected '}' after enum body")
+    var node: ASTNode = AST_node_new(STMT_ENUM(), token_line(tok), token_col(tok))
+    node.name = token_lexeme(tok)
+    node.members = members
+    node.is_exported = exported
+    return node
+}
+
+func Parser_parse_statement(p: Parser): ASTNode {
+    if (Parser_check(p, LBRACE())) {
+        return Parser_parse_block(p)
+    }
+    if (Parser_match(p, IF())) {
+        return Parser_parse_if(p)
+    }
+    if (Parser_match(p, WHILE())) {
+        return Parser_parse_while(p)
+    }
+    if (Parser_match(p, RETURN())) {
+        var tok: any = token_array_get(p.p_tokens, p.p_current - 1)
+        var val: any = 0
+        if (!Parser_check(p, SEMI()) and !Parser_check(p, RBRACE())) {
+            val = Parser_parse_expression(p)
+        }
+        Parser_match(p, SEMI())
+        var node: ASTNode = AST_node_new(STMT_RETURN(), token_line(tok), token_col(tok))
+        node.right = val
+        return node
+    }
+    if (Parser_match(p, VAR()) or Parser_match(p, LET()) or Parser_match(p, CONST())) {
+        var tok: any = token_array_get(p.p_tokens, p.p_current - 1)
+        var name: any = Parser_consume(p, IDENTIFIER(), "Expected identifier after storage keyword")
+        var ty: str = ""
+        if (Parser_match(p, COLON())) {
+            var t_tok: any = Parser_consume(p, IDENTIFIER(), "Expected type name")
+            ty = token_lexeme(t_tok)
+        }
+        var init: any = 0
+        if (Parser_match(p, ASSIGN())) {
+            init = Parser_parse_expression(p)
+        }
+        Parser_match(p, SEMI())
+        var node: ASTNode = AST_node_new(STMT_VAR_DECL(), token_line(tok), token_col(tok))
+        node.name = token_lexeme(name)
+        node.ty_name = ty
+        node.initializer = init
+        return node
+    }
+    
+    var expr: ASTNode = Parser_parse_expression(p)
+    Parser_match(p, SEMI())
+    var st: ASTNode = AST_node_new(STMT_EXPR(), expr.n_line, expr.n_col)
+    st.left = expr
+    return st
+}
+
+func Parser_parse_program(p: Parser): any {
+    var stmts: any = ptr_array_new()
+    while (!Parser_at_end(p)) {
+        var exported: bool = Parser_match(p, EXPORT())
+        
+        if (Parser_match(p, IMPORT())) {
+            var path: any = Parser_consume(p, STRING(), "Expected import path")
+            var node: ASTNode = AST_node_new(STMT_IMPORT(), token_line(path), token_col(path))
+            node.value = token_lexeme(path)
+            ptr_array_append(stmts, node)
+        }
+        else if (Parser_match(p, FUNC())) {
+            ptr_array_append(stmts, Parser_parse_function(p, exported))
+        }
+        else if (Parser_match(p, STRUCT())) {
+            ptr_array_append(stmts, Parser_parse_struct(p, exported))
+        }
+        else if (Parser_match(p, ENUM())) {
+            ptr_array_append(stmts, Parser_parse_enum(p, exported))
+        }
+        else {
+            ptr_array_append(stmts, Parser_parse_statement(p))
+        }
+    }
+    return stmts
+}
