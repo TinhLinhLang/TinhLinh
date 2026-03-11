@@ -202,52 +202,52 @@ func CodeGen_generate_expr(cg: CodeGen, node: ASTNode): str {
     
     let kind: int32 = node.n_kind
     
-    if (kind == EXPR_LITERAL()) {
-        if (str_eq(node.value, "true")) { return "1" }
-        if (str_eq(node.value, "false")) { return "0" }
-        if (!is_numeric(node.value)) {
-            cg.string_count = cg.string_count + 1
-            let g_name: str = "@.str." + i32_to_str(cg.string_count)
-            let raw: str = node.value
-            let size: int32 = len(raw) + 1
-            
-            // Build LLVM IR string using hex format for special characters
-            let llvm_str: str = "c\""
-            let i: int32 = 0
-            while (i < len(raw)) {
-                let c: int32 = charAt(raw, i)
-                if (c == 10) {  // newline
-                    llvm_str = llvm_str + "\\0A"
-                } else if (c == 9) {  // tab
-                    llvm_str = llvm_str + "\\09"
-                } else if (c == 13) {  // carriage return
-                    llvm_str = llvm_str + "\\0D"
-                } else if (c == 92) {  // backslash
-                    llvm_str = llvm_str + "\\5C"
-                } else if (c == 34) {  // quote
-                    llvm_str = llvm_str + "\\22"
-                } else if (c == 0) {  // null
-                    llvm_str = llvm_str + "\\00"
-                } else if (c < 32 or c > 126) {  // non-printable
-                    // Use hex format for non-printable characters
-                    llvm_str = llvm_str + "\\00"  // placeholder, should convert to hex
-                } else {
-                    llvm_str = llvm_str + substr(raw, i, 1)
+    switch (kind) {
+        case EXPR_LITERAL(): {
+            if (str_eq(node.value, "true")) { return "1" }
+            if (str_eq(node.value, "false")) { return "0" }
+            if (!is_numeric(node.value)) {
+                cg.string_count = cg.string_count + 1
+                let g_name: str = "@.str." + i32_to_str(cg.string_count)
+                let raw: str = node.value
+                let size: int32 = len(raw) + 1
+                
+                // Build LLVM IR string using hex format for special characters
+                let llvm_str: str = "c\""
+                let i: int32 = 0
+                while (i < len(raw)) {
+                    let c: int32 = charAt(raw, i)
+                    if (c == 10) {  // newline
+                        llvm_str = llvm_str + "\\0A"
+                    } else if (c == 9) {  // tab
+                        llvm_str = llvm_str + "\\09"
+                    } else if (c == 13) {  // carriage return
+                        llvm_str = llvm_str + "\\0D"
+                    } else if (c == 92) {  // backslash
+                        llvm_str = llvm_str + "\\5C"
+                    } else if (c == 34) {  // quote
+                        llvm_str = llvm_str + "\\22"
+                    } else if (c == 0) {  // null
+                        llvm_str = llvm_str + "\\00"
+                    } else if (c < 32 or c > 126) {  // non-printable
+                        // Use hex format for non-printable characters
+                        llvm_str = llvm_str + "\\00"  // placeholder, should convert to hex
+                    } else {
+                        llvm_str = llvm_str + substr(raw, i, 1)
+                    }
+                    i = i + 1
                 }
-                i = i + 1
+                llvm_str = llvm_str + "\\00\""
+                
+                CodeGen_emit_global(cg, g_name + " = private unnamed_addr constant [" + i32_to_str(size) + " x i8] " + llvm_str + ", align 1")
+                let res: str = CodeGen_next_temp(cg)
+                CodeGen_emit(cg, res + " = getelementptr inbounds [" + i32_to_str(size) + " x i8], ptr " + g_name + ", i32 0, i32 0")
+                return res
             }
-            llvm_str = llvm_str + "\\00\""
-            
-            CodeGen_emit_global(cg, g_name + " = private unnamed_addr constant [" + i32_to_str(size) + " x i8] " + llvm_str + ", align 1")
-            let res: str = CodeGen_next_temp(cg)
-            CodeGen_emit(cg, res + " = getelementptr inbounds [" + i32_to_str(size) + " x i8], ptr " + g_name + ", i32 0, i32 0")
-            return res
+            return node.value
         }
-        return node.value
-    }
-    
-    if (kind == EXPR_VARIABLE()) {
-        let res: str = CodeGen_next_temp(cg)
+        case EXPR_VARIABLE(): {
+            let res: str = CodeGen_next_temp(cg)
         let load_type: str = "i32"
         if (str_eq(node.name, "input") or str_eq(node.name, "output") or str_eq(node.name, "input_path") or str_eq(node.name, "output_path") or str_eq(node.name, "name") or str_eq(node.name, "value") or str_eq(node.name, "lexeme") or str_eq(node.name, "ty_name") or str_eq(node.name, "source") or str_eq(node.name, "text") or str_eq(node.name, "content") or str_eq(node.name, "lexer") or str_eq(node.name, "tokens") or str_eq(node.name, "parser") or str_eq(node.name, "cg") or str_eq(node.name, "stmts") or str_eq(node.name, "args") or str_eq(node.name, "params") or str_eq(node.name, "ir") or str_eq(node.name, "base_dir") or str_eq(node.name, "mm") or str_eq(node.name, "resolved_path") or str_eq(node.name, "import_path") or str_eq(node.name, "escaped") or str_eq(node.name, "llvm_str") or str_eq(node.name, "raw") or str_eq(node.name, "g_name") or str_eq(node.name, "res") or str_eq(node.name, "lhs") or str_eq(node.name, "rhs") or str_eq(node.name, "actual_name") or str_eq(node.name, "ret_ty") or str_eq(node.name, "param_types") or str_eq(node.name, "args_str") or str_eq(node.name, "load_type") or str_eq(node.name, "l1") or str_eq(node.name, "l2") or str_eq(node.name, "l3") or str_eq(node.name, "ds") or str_eq(node.name, "functions") or str_eq(node.name, "result") or str_eq(node.name, "mod") or str_eq(node.name, "main_module") or str_eq(node.name, "current_stmts") or str_eq(node.name, "new_to_process") or str_eq(node.name, "to_process") or str_eq(node.name, "imports") or str_eq(node.name, "all_stmts") or str_eq(node.name, "mod_lexer") or str_eq(node.name, "mod_tokens") or str_eq(node.name, "mod_parser") or str_eq(node.name, "mod_stmts") or str_eq(node.name, "t") or str_eq(node.name, "l") or str_eq(node.name, "p") or str_eq(node.name, "node") or str_eq(node.name, "tok") or str_eq(node.name, "param") or str_eq(node.name, "expr") or str_eq(node.name, "stmt")) {
             load_type = "ptr"

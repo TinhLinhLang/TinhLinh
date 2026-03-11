@@ -33,12 +33,14 @@ func Type_is_numeric(kind: int32): bool {
 
 // Type to string
 func Type_to_string(kind: int32): str {
-    if (kind == TYPE_INT32()) { return "int32" }
-    if (kind == TYPE_STR()) { return "str" }
-    if (kind == TYPE_BOOL()) { return "bool" }
-    if (kind == TYPE_VOID()) { return "void" }
-    if (kind == TYPE_ANY()) { return "any" }
-    return "unknown"
+    switch (kind) {
+        case TYPE_INT32(): { return "int32" }
+        case TYPE_STR(): { return "str" }
+        case TYPE_BOOL(): { return "bool" }
+        case TYPE_VOID(): { return "void" }
+        case TYPE_ANY(): { return "any" }
+        default: { return "unknown" }
+    }
 }
 
 // Test functions

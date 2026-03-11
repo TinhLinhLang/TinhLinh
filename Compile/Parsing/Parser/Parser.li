@@ -57,53 +57,56 @@ func Parser_parse_primary(p: Parser): ASTNode {
     let tok: any = Parser_peek(p)
     let kind_id: int32 = token_type(tok)
     
-    if (kind_id == STRING()) {
-        Parser_advance(p)
-        let n: ASTNode = AST_node_new(EXPR_LITERAL(), token_line(tok), token_col(tok))
-        n.value = token_lexeme(tok)
-        return n
-    }
-    if (kind_id == TRUE()) {
-        Parser_advance(p)
-        let n: ASTNode = AST_node_new(EXPR_LITERAL(), token_line(tok), token_col(tok))
-        n.value = "true"
-        return n
-    }
-    if (kind_id == FALSE()) {
-        Parser_advance(p)
-        let n: ASTNode = AST_node_new(EXPR_LITERAL(), token_line(tok), token_col(tok))
-        n.value = "false"
-        return n
-    }
-    if (kind_id == IDENTIFIER()) {
-        let lexeme: str = token_lexeme(tok)
-        // Check if it's a number (starts with digit)
-        if (len(lexeme) > 0) {
-            let first_char: int32 = charAt(lexeme, 0)
-            if (first_char >= 48 and first_char <= 57) {
-                // It's a number literal
-                Parser_advance(p)
-                let n: ASTNode = AST_node_new(EXPR_LITERAL(), token_line(tok), token_col(tok))
-                n.value = lexeme
-                return n
-            }
+    switch (kind_id) {
+        case STRING(): {
+            Parser_advance(p)
+            let n: ASTNode = AST_node_new(EXPR_LITERAL(), token_line(tok), token_col(tok))
+            n.value = token_lexeme(tok)
+            return n
         }
-        // It's a variable
-        Parser_advance(p)
-        let n: ASTNode = AST_node_new(EXPR_VARIABLE(), token_line(tok), token_col(tok))
-        n.name = lexeme
-        return n
+        case TRUE(): {
+            Parser_advance(p)
+            let n: ASTNode = AST_node_new(EXPR_LITERAL(), token_line(tok), token_col(tok))
+            n.value = "true"
+            return n
+        }
+        case FALSE(): {
+            Parser_advance(p)
+            let n: ASTNode = AST_node_new(EXPR_LITERAL(), token_line(tok), token_col(tok))
+            n.value = "false"
+            return n
+        }
+        case IDENTIFIER(): {
+            let lexeme: str = token_lexeme(tok)
+            // Check if it's a number (starts with digit)
+            if (len(lexeme) > 0) {
+                let first_char: int32 = charAt(lexeme, 0)
+                if (first_char >= 48 and first_char <= 57) {
+                    // It's a number literal
+                    Parser_advance(p)
+                    let n: ASTNode = AST_node_new(EXPR_LITERAL(), token_line(tok), token_col(tok))
+                    n.value = lexeme
+                    return n
+                }
+            }
+            // It's a variable
+            Parser_advance(p)
+            let n: ASTNode = AST_node_new(EXPR_VARIABLE(), token_line(tok), token_col(tok))
+            n.name = lexeme
+            return n
+        }
+        case LPAREN(): {
+            Parser_advance(p)
+            let expr: ASTNode = Parser_parse_expression(p)
+            Parser_consume(p, RPAREN(), "Expected ')' after expression")
+            return expr
+        }
+        default: {
+            print("Parser Error: Unexpected token '", token_lexeme(tok), "' at line ", i32_to_str(token_line(tok)))
+            Parser_advance(p)
+            return AST_node_new(0, 0, 0)
+        }
     }
-    if (kind_id == LPAREN()) {
-        Parser_advance(p)
-        let expr: ASTNode = Parser_parse_expression(p)
-        Parser_consume(p, RPAREN(), "Expected ')' after expression")
-        return expr
-    }
-    
-    print("Parser Error: Unexpected token '", token_lexeme(tok), "' at line ", i32_to_str(token_line(tok)))
-    Parser_advance(p)
-    return AST_node_new(0, 0, 0)
 }
 
 func Parser_parse_call(p: Parser): ASTNode {
