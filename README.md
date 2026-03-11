@@ -6,7 +6,7 @@
 
 This repository (`https://github.com/TinhLinhLang/TinhLinh`) contains the complete Tinh Linh language implementation:
 
-> **📝 Repository History Note**: This repository contains commits from the self-hosting milestone onwards (March 2026). Earlier development history and the original C++ interpreter implementation can be found at [github.com/TinhLinhLang/Linh](https://github.com/TinhLinhLang/Linh) - though that interpreter has been deprecated and replaced by the current self-hosted compiler. Some intermediate commits may have been lost during the transition to the self-hosted architecture.
+> **📝 Note**: For complete development history and repository evolution details, see [REPOSITORY_HISTORY.md](REPOSITORY_HISTORY.md).
 
 - **Tinh**: AOT (Ahead-of-Time) compiler with LLVM backend - optimized for production deployment
 - **Linh**: Interpreter implementation - provides fast development and testing capabilities
