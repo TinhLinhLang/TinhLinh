@@ -4,6 +4,14 @@
 import "TypeSystem.li"
 import "TypeInference.li"
 
+// Normalize type aliases to their concrete types
+func normalize_type_name(ty_name: str): str {
+    if (str_eq(ty_name, "int")) { return "int32" }
+    if (str_eq(ty_name, "uint")) { return "uint32" }
+    if (str_eq(ty_name, "float")) { return "float32" }
+    return ty_name  // Return as-is for other types
+}
+
 // Function signature tracking
 export struct FunctionSignature {
     let name: str
@@ -240,15 +248,21 @@ func AdvancedTypeChecker_process_function(atc: AdvancedTypeChecker, node: any) {
     // Determine return type
     let ret_type: Type = Type_new(TYPE_INT32(), "int32")
     if (!str_eq(node.ty_name, "")) {
-        if (str_eq(node.ty_name, "void")) {
+        let normalized_type: str = normalize_type_name(node.ty_name)
+        
+        if (str_eq(normalized_type, "void")) {
             ret_type = Type_new(TYPE_VOID(), "void")
-        } else if (str_eq(node.ty_name, "str")) {
+        } else if (str_eq(normalized_type, "int32")) {
+            ret_type = Type_new(TYPE_INT32(), "int32")
+        } else if (str_eq(normalized_type, "uint32")) {
+            ret_type = Type_new(TYPE_INT32(), "uint32")
+        } else if (str_eq(normalized_type, "float32")) {
+            ret_type = Type_new(TYPE_FLOAT(), "float32")
+        } else if (str_eq(normalized_type, "str")) {
             ret_type = Type_new(TYPE_STR(), "str")
-        } else if (str_eq(node.ty_name, "bool")) {
+        } else if (str_eq(normalized_type, "bool")) {
             ret_type = Type_new(TYPE_BOOL(), "bool")
-        } else if (str_eq(node.ty_name, "float")) {
-            ret_type = Type_new(TYPE_FLOAT(), "float")
-        } else if (str_eq(node.ty_name, "any")) {
+        } else if (str_eq(normalized_type, "any")) {
             ret_type = Type_new(TYPE_ANY(), "any")
         } else {
             ret_type = Type_new(TYPE_STRUCT(), node.ty_name)
@@ -266,13 +280,19 @@ func AdvancedTypeChecker_process_function(atc: AdvancedTypeChecker, node: any) {
             let param_type: Type = Type_new(TYPE_INT32(), "int32")
             
             if (!str_eq(param.ty_name, "")) {
-                if (str_eq(param.ty_name, "str")) {
+                let normalized_param_type: str = normalize_type_name(param.ty_name)
+                
+                if (str_eq(normalized_param_type, "int32")) {
+                    param_type = Type_new(TYPE_INT32(), "int32")
+                } else if (str_eq(normalized_param_type, "uint32")) {
+                    param_type = Type_new(TYPE_INT32(), "uint32")
+                } else if (str_eq(normalized_param_type, "float32")) {
+                    param_type = Type_new(TYPE_FLOAT(), "float32")
+                } else if (str_eq(normalized_param_type, "str")) {
                     param_type = Type_new(TYPE_STR(), "str")
-                } else if (str_eq(param.ty_name, "bool")) {
+                } else if (str_eq(normalized_param_type, "bool")) {
                     param_type = Type_new(TYPE_BOOL(), "bool")
-                } else if (str_eq(param.ty_name, "float")) {
-                    param_type = Type_new(TYPE_FLOAT(), "float")
-                } else if (str_eq(param.ty_name, "any")) {
+                } else if (str_eq(normalized_param_type, "any")) {
                     param_type = Type_new(TYPE_ANY(), "any")
                 } else {
                     param_type = Type_new(TYPE_STRUCT(), param.ty_name)
@@ -300,13 +320,19 @@ func AdvancedTypeChecker_process_struct(atc: AdvancedTypeChecker, node: any) {
             let field_type: Type = Type_new(TYPE_INT32(), "int32")
             
             if (!str_eq(field.ty_name, "")) {
-                if (str_eq(field.ty_name, "str")) {
+                let normalized_field_type: str = normalize_type_name(field.ty_name)
+                
+                if (str_eq(normalized_field_type, "int32")) {
+                    field_type = Type_new(TYPE_INT32(), "int32")
+                } else if (str_eq(normalized_field_type, "uint32")) {
+                    field_type = Type_new(TYPE_INT32(), "uint32")
+                } else if (str_eq(normalized_field_type, "float32")) {
+                    field_type = Type_new(TYPE_FLOAT(), "float32")
+                } else if (str_eq(normalized_field_type, "str")) {
                     field_type = Type_new(TYPE_STR(), "str")
-                } else if (str_eq(field.ty_name, "bool")) {
+                } else if (str_eq(normalized_field_type, "bool")) {
                     field_type = Type_new(TYPE_BOOL(), "bool")
-                } else if (str_eq(field.ty_name, "float")) {
-                    field_type = Type_new(TYPE_FLOAT(), "float")
-                } else if (str_eq(field.ty_name, "any")) {
+                } else if (str_eq(normalized_field_type, "any")) {
                     field_type = Type_new(TYPE_ANY(), "any")
                 } else {
                     field_type = Type_new(TYPE_STRUCT(), field.ty_name)

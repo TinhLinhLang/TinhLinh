@@ -168,10 +168,14 @@ func TypedCodeGen_generate_typed_var_decl(tcg: TypedCodeGen, node: any) {
     if (!str_eq(node.ty_name, "")) {
         if (str_eq(node.ty_name, "str")) {
             var_type = Type_new(TYPE_STR(), "str")
+        } else if (str_eq(node.ty_name, "int") or str_eq(node.ty_name, "int32")) {
+            var_type = Type_new(TYPE_INT32(), "int32")
+        } else if (str_eq(node.ty_name, "uint") or str_eq(node.ty_name, "uint32")) {
+            var_type = Type_new(TYPE_INT32(), "uint32")
+        } else if (str_eq(node.ty_name, "float") or str_eq(node.ty_name, "float32")) {
+            var_type = Type_new(TYPE_FLOAT(), "float32")
         } else if (str_eq(node.ty_name, "bool")) {
             var_type = Type_new(TYPE_BOOL(), "bool")
-        } else if (str_eq(node.ty_name, "float")) {
-            var_type = Type_new(TYPE_FLOAT(), "float")
         } else if (str_eq(node.ty_name, "any")) {
             var_type = Type_new(TYPE_ANY(), "any")
         } else {

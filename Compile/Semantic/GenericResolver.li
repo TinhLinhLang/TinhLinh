@@ -1,0 +1,242 @@
+// Generic Resolution and Monomorphization
+// Shared between Tinh (compiler) and Linh (interpreter)
+
+export struct GenericRegistry {
+    let generic_funcs: any    // Map: func_name -> GenericFuncDeclNode
+    let instantiations: any   // Map: "func_name<type1,type2>" -> monomorphized AST
+}
+
+func GenericRegistry_new(): GenericRegistry {
+    return GenericRegistry{ptr_array_new(), ptr_array_new()}
+}
+
+// Register a generic function definition
+func GenericRegistry_register(gr: GenericRegistry, func_name: str, func_node: any) {
+    ptr_array_append(gr.generic_funcs, func_name)
+    ptr_array_append(gr.generic_funcs, func_node)
+}
+
+// Find generic function by name
+func GenericRegistry_find(gr: GenericRegistry, func_name: str): any {
+    let n: int32 = ptr_array_len(gr.generic_funcs)
+    let i: int32 = 0
+    while (i < n) {
+        let name: str = ptr_array_get(gr.generic_funcs, i)
+        if (str_eq(name, func_name)) {
+            return ptr_array_get(gr.generic_funcs, i + 1)
+        }
+        i = i + 2
+    }
+    return 0  // Not found
+}
+
+// Check if function is generic
+func GenericRegistry_has(gr: GenericRegistry, func_name: str): bool {
+    let node: any = GenericRegistry_find(gr, func_name)
+    return node != 0
+}
+
+// Create instantiation key: "identity<int32>"
+func create_inst_key(func_name: str, type_args: any): str {
+    let key: str = func_name
+    key = str_concat(key, "<")
+    
+    let n: int32 = ptr_array_len(type_args)
+    let i: int32 = 0
+    while (i < n) {
+        if (i > 0) {
+            key = str_concat(key, ",")
+        }
+        let ty: str = ptr_array_get(type_args, i)
+        key = str_concat(key, ty)
+        i = i + 1
+    }
+    
+    key = str_concat(key, ">")
+    return key
+}
+
+// Mangle name for code generation: identity<int32> -> identity_int32
+func mangle_generic_name(func_name: str, type_args: any): str {
+    let result: str = func_name
+    let i: int32 = 0
+    let n: int32 = ptr_array_len(type_args)
+    while (i < n) {
+        let ty: str = ptr_array_get(type_args, i)
+        result = str_concat(result, "_")
+        result = str_concat(result, ty)
+        i = i + 1
+    }
+    return result
+}
+
+// Check if instantiation already exists
+func GenericRegistry_has_instantiation(gr: GenericRegistry, key: str): bool {
+    let n: int32 = ptr_array_len(gr.instantiations)
+    let i: int32 = 0
+    while (i < n) {
+        let k: str = ptr_array_get(gr.instantiations, i)
+        if (str_eq(k, key)) {
+            return true
+        }
+        i = i + 2
+    }
+    return false
+}
+
+// Get existing instantiation
+func GenericRegistry_get_instantiation(gr: GenericRegistry, key: str): any {
+    let n: int32 = ptr_array_len(gr.instantiations)
+    let i: int32 = 0
+    while (i < n) {
+        let k: str = ptr_array_get(gr.instantiations, i)
+        if (str_eq(k, key)) {
+            return ptr_array_get(gr.instantiations, i + 1)
+        }
+        i = i + 2
+    }
+    return 0
+}
+
+// Store instantiation
+func GenericRegistry_store_instantiation(gr: GenericRegistry, key: str, concrete_func: any) {
+    ptr_array_append(gr.instantiations, key)
+    ptr_array_append(gr.instantiations, concrete_func)
+}
+
+// Create type substitution map: [T, U] + [int32, str] -> {T: int32, U: str}
+func create_type_map(type_params: any, type_args: any): any {
+    let type_map: any = ptr_array_new()
+    
+    let n: int32 = ptr_array_len(type_params)
+    let i: int32 = 0
+    while (i < n) {
+        let param: str = ptr_array_get(type_params, i)
+        let arg: str = ptr_array_get(type_args, i)
+        
+        ptr_array_append(type_map, param)
+        ptr_array_append(type_map, arg)
+        
+        i = i + 1
+    }
+    
+    return type_map
+}
+
+// Lookup type in substitution map
+func type_map_lookup(type_map: any, type_param: str): str {
+    let n: int32 = ptr_array_len(type_map)
+    let i: int32 = 0
+    while (i < n) {
+        let param: str = ptr_array_get(type_map, i)
+        if (str_eq(param, type_param)) {
+            return ptr_array_get(type_map, i + 1)
+        }
+        i = i + 2
+    }
+    return type_param  // Not found, return original
+}
+
+// Substitute types in a type string
+func substitute_type(ty: str, type_map: any): str {
+    // If ty is a type parameter (T, U), replace it
+    // Otherwise, return as-is
+    return type_map_lookup(type_map, ty)
+}
+
+// Main monomorphization function
+func GenericRegistry_instantiate(gr: GenericRegistry, 
+                                  func_name: str, 
+                                  type_args: any): any {
+    // 1. Create instantiation key
+    let key: str = create_inst_key(func_name, type_args)
+    
+    // 2. Check if already instantiated
+    if (GenericRegistry_has_instantiation(gr, key)) {
+        return GenericRegistry_get_instantiation(gr, key)
+    }
+    
+    // 3. Find generic function definition
+    let generic_func: any = GenericRegistry_find(gr, func_name)
+    if (generic_func == 0) {
+        // Error: generic function not found
+        return 0
+    }
+    
+    // 4. Create type substitution map
+    let type_map: any = create_type_map(generic_func.type_params, type_args)
+    
+    // 5. Clone and substitute types in function
+    let concrete_func: any = substitute_types_in_func(generic_func, type_map)
+    
+    // 6. Generate mangled name
+    let mangled_name: str = mangle_generic_name(func_name, type_args)
+    concrete_func.name = mangled_name
+    
+    // 7. Store instantiation
+    GenericRegistry_store_instantiation(gr, key, concrete_func)
+    
+    return concrete_func
+}
+
+// Substitute types throughout function AST
+func substitute_types_in_func(func_node: any, type_map: any): any {
+    // Clone function node
+    let new_func: any = clone_func_node(func_node)
+    
+    // Substitute in parameters
+    new_func.params = substitute_types_in_params(func_node.params, type_map)
+    
+    // Substitute in return type
+    new_func.return_type = substitute_type(func_node.return_type, type_map)
+    
+    // Substitute in body
+    new_func.body = substitute_types_in_body(func_node.body, type_map)
+    
+    return new_func
+}
+
+// Helper: Clone function node (shallow copy)
+func clone_func_node(func_node: any): any {
+    // Create new function node with same structure
+    // This is a simplified version - real implementation needs deep copy
+    return func_node
+}
+
+// Helper: Substitute types in parameters
+func substitute_types_in_params(params: any, type_map: any): any {
+    let new_params: any = ptr_array_new()
+    
+    let n: int32 = ptr_array_len(params)
+    let i: int32 = 0
+    while (i < n) {
+        let param: any = ptr_array_get(params, i)
+        
+        // Substitute parameter type
+        let new_param: any = clone_param(param)
+        new_param.type = substitute_type(param.type, type_map)
+        
+        ptr_array_append(new_params, new_param)
+        i = i + 1
+    }
+    
+    return new_params
+}
+
+// Helper: Clone parameter
+func clone_param(param: any): any {
+    return param  // Simplified
+}
+
+// Helper: Substitute types in function body
+func substitute_types_in_body(body: any, type_map: any): any {
+    // Recursively walk AST and substitute types
+    // This is the core of monomorphization
+    
+    // For each statement/expression:
+    // - If it's a variable declaration, substitute the type
+    // - If it's a function call, check if it's generic and instantiate
+    // - If it's a type annotation, substitute
+    
+    return body  // Simplified - real implementation needs full AST traversal
+}

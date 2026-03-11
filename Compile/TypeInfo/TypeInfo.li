@@ -70,6 +70,7 @@ func TypeInfo_init_runtime(ti: TypeInfo) {
     TypeInfo_set_func_sig(ti, "writeFile", "void", "pp")
     TypeInfo_set_func_sig(ti, "str_eq", "i1", "pp")
     TypeInfo_set_func_sig(ti, "i32_to_str", "ptr", "i")
+    TypeInfo_set_func_sig(ti, "tinh_str_concat", "ptr", "pp")  // NEW: String concatenation
     TypeInfo_set_func_sig(ti, "ptr_array_new", "ptr", "")
     TypeInfo_set_func_sig(ti, "ptr_array_append", "void", "pp")
     TypeInfo_set_func_sig(ti, "ptr_array_len", "i32", "p")
@@ -81,16 +82,21 @@ func TypeInfo_init_runtime(ti: TypeInfo) {
 }
 
 func get_llvm_type_from_tinh(ty: str): str {
-    if (str_eq(ty, "int32") or str_eq(ty, "bool") or str_eq(ty, "i32") or str_eq(ty, "i1")) { return "i32" }
+    // Handle type aliases first
+    if (str_eq(ty, "int") or str_eq(ty, "int32") or str_eq(ty, "bool") or str_eq(ty, "i32") or str_eq(ty, "i1")) { return "i32" }
+    if (str_eq(ty, "uint") or str_eq(ty, "uint32")) { return "i32" }
+    if (str_eq(ty, "float") or str_eq(ty, "float32")) { return "float" }
+    
+    // Specific sized types
     if (str_eq(ty, "int8") or str_eq(ty, "i8")) { return "i8" }
     if (str_eq(ty, "int16") or str_eq(ty, "i16")) { return "i16" }
     if (str_eq(ty, "int64") or str_eq(ty, "i64")) { return "i64" }
     if (str_eq(ty, "uint8")) { return "i8" }
     if (str_eq(ty, "uint16")) { return "i16" }
-    if (str_eq(ty, "uint32")) { return "i32" }
     if (str_eq(ty, "uint64")) { return "i64" }
-    if (str_eq(ty, "float32")) { return "float" }
     if (str_eq(ty, "float64") or str_eq(ty, "double")) { return "double" }
+    
+    // Other types
     if (str_eq(ty, "str") or str_eq(ty, "any") or str_eq(ty, "ptr")) { return "ptr" }
     if (str_eq(ty, "void") or str_eq(ty, "")) { return "void" }
     return "ptr"  // Custom types are pointers

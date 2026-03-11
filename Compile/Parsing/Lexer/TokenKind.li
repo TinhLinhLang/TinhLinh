@@ -25,15 +25,15 @@ func SWITCH(): int32 { return 27 }
 func CASE(): int32 { return 28 }
 func DEFAULT(): int32 { return 29 }
 
-// Types
-func INT_KW(): int32 { return 30 }
-func UINT_KW(): int32 { return 31 }
+// Types (specific types only - no generic aliases)
 func STR_KW(): int32 { return 32 }
 func BOOL_KW(): int32 { return 33 }
-func FLOAT_KW(): int32 { return 34 }
 func VOID_KW(): int32 { return 35 }
 func ANY_KW(): int32 { return 36 }
 func BYTE_KW(): int32 { return 37 }
+
+// Note: Use specific types (int32, uint32, float32) instead of generic (int, uint, float)
+// This reduces ambiguity and makes type system more explicit
 
 // Punctuation
 func LPAREN(): int32 { return 40 }

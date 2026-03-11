@@ -1,5 +1,13 @@
 import "../Parsing/AST/AST.li"
 
+// Normalize type aliases to their concrete types
+func normalize_type_name(ty_name: str): str {
+    if (str_eq(ty_name, "int")) { return "int32" }
+    if (str_eq(ty_name, "uint")) { return "uint32" }
+    if (str_eq(ty_name, "float")) { return "float32" }
+    return ty_name  // Return as-is for other types
+}
+
 export struct CodeGen {
     let output: str
     let globals: str
@@ -122,6 +130,7 @@ func get_function_signature(name: str): FunctionSignature {
     if (str_eq(name, "writeFile")) { return FunctionSignature{"void", "pp", true, "tinh_write_file"} }
     if (str_eq(name, "str_eq")) { return FunctionSignature{"i32", "pp", true, "tinh_str_eq"} }
     if (str_eq(name, "i32_to_str")) { return FunctionSignature{"ptr", "i", true, "tinh_i32_to_str"} }
+    if (str_eq(name, "tinh_str_concat")) { return FunctionSignature{"ptr", "pp", true, "tinh_str_concat"} }  // NEW
     if (str_eq(name, "print")) { return FunctionSignature{"void", "p", true, "tinh_print_str"} }
     
     // Runtime functions with same name
@@ -300,7 +309,29 @@ func CodeGen_generate_expr(cg: CodeGen, node: ASTNode): str {
         let lhs: str = CodeGen_generate_expr(cg, node.left)
         let rhs: str = CodeGen_generate_expr(cg, node.right)
         let res: str = CodeGen_next_temp(cg)
-        if (str_eq(node.value, "+")) { CodeGen_emit(cg, res + " = add i32 " + lhs + ", " + rhs) }
+        
+        if (str_eq(node.value, "+")) { 
+            // Check if this is string concatenation
+            // Simple heuristic: if either operand starts with @ (global string) or % (temp var that might be string)
+            let is_string_concat: bool = false
+            
+            // Check if left operand is a string literal (starts with @)
+            if (len(lhs) > 0 and charAt(lhs, 0) == 64) {  // @ character
+                is_string_concat = true
+            }
+            // Check if right operand is a string literal (starts with @)
+            if (len(rhs) > 0 and charAt(rhs, 0) == 64) {  // @ character
+                is_string_concat = true
+            }
+            
+            if (is_string_concat) {
+                // String concatenation - use tinh_str_concat
+                CodeGen_emit(cg, res + " = call ptr @tinh_str_concat(ptr " + lhs + ", ptr " + rhs + ")")
+            } else {
+                // Numeric addition
+                CodeGen_emit(cg, res + " = add i32 " + lhs + ", " + rhs)
+            }
+        }
         else if (str_eq(node.value, "-")) { CodeGen_emit(cg, res + " = sub i32 " + lhs + ", " + rhs) }
         else if (str_eq(node.value, "*")) { CodeGen_emit(cg, res + " = mul i32 " + lhs + ", " + rhs) }
         else if (str_eq(node.value, "==")) { 
@@ -501,8 +532,12 @@ func CodeGen_generate_stmt(cg: CodeGen, node: ASTNode) {
     
     if (kind == STMT_VAR_DECL()) {
         let storage_type: str = node.value
-        let var_type: str = get_llvm_type(node.ty_name)
+        let normalized_type: str = normalize_type_name(node.ty_name)
+        let var_type: str = get_llvm_type(normalized_type)
         if (str_eq(var_type, "void")) { var_type = "i32" }
+        
+        // Debug output
+        CodeGen_emit_raw(cg, "; DEBUG: original type = " + node.ty_name + ", normalized = " + normalized_type + ", llvm = " + var_type)
         
         if (node.initializer != 0) {
             let val: str = CodeGen_generate_expr(cg, node.initializer)
@@ -635,16 +670,21 @@ func CodeGen_generate_stmt(cg: CodeGen, node: ASTNode) {
 }
 
 func get_llvm_type(ty: str): str {
-    if (str_eq(ty, "int32") or str_eq(ty, "bool")) { return "i32" }
+    // Handle type aliases first
+    if (str_eq(ty, "int") or str_eq(ty, "int32") or str_eq(ty, "bool")) { return "i32" }
+    if (str_eq(ty, "uint") or str_eq(ty, "uint32")) { return "i32" }
+    if (str_eq(ty, "float") or str_eq(ty, "float32")) { return "float" }
+    
+    // Specific sized types
     if (str_eq(ty, "int8")) { return "i8" }
     if (str_eq(ty, "int16")) { return "i16" }
     if (str_eq(ty, "int64")) { return "i64" }
     if (str_eq(ty, "uint8")) { return "i8" }
     if (str_eq(ty, "uint16")) { return "i16" }
-    if (str_eq(ty, "uint32")) { return "i32" }
     if (str_eq(ty, "uint64")) { return "i64" }
-    if (str_eq(ty, "float32")) { return "float" }
     if (str_eq(ty, "float64")) { return "double" }
+    
+    // Other types
     if (str_eq(ty, "str")) { return "ptr" }
     if (str_eq(ty, "any")) { return "ptr" }
     if (str_eq(ty, "void") or str_eq(ty, "")) { return "void" }
@@ -657,7 +697,7 @@ func CodeGen_generate_function(cg: CodeGen, node: ASTNode): str {
     cg.temp_count = 0
     cg.label_count = 0
     
-    let ret_type: str = get_llvm_type(node.ty_name)
+    let ret_type: str = get_llvm_type(normalize_type_name(node.ty_name))
     cg.current_func_return_type = ret_type
     let func_name: str = node.name
     
@@ -667,7 +707,7 @@ func CodeGen_generate_function(cg: CodeGen, node: ASTNode): str {
     while (i < n_params) {
         let param: ASTNode = ptr_array_get(node.args, i)
         if (i > 0) { params_str = params_str + ", " }
-        let param_type: str = get_llvm_type(param.ty_name)
+        let param_type: str = get_llvm_type(normalize_type_name(param.ty_name))
         params_str = params_str + param_type + " %arg_" + param.name
         i = i + 1
     }
@@ -678,7 +718,7 @@ func CodeGen_generate_function(cg: CodeGen, node: ASTNode): str {
     i = 0
     while (i < n_params) {
         let param: ASTNode = ptr_array_get(node.args, i)
-        let param_type: str = get_llvm_type(param.ty_name)
+        let param_type: str = get_llvm_type(normalize_type_name(param.ty_name))
         CodeGen_emit(cg, "%" + param.name + " = alloca " + param_type)
         CodeGen_emit(cg, "store " + param_type + " %arg_" + param.name + ", ptr %" + param.name)
         i = i + 1
@@ -770,6 +810,7 @@ func CodeGen_run(cg: CodeGen, stmts: any): str {
     ds = ds + "declare void @tinh_write_file(ptr, ptr)\n"
     ds = ds + "declare i1 @tinh_str_eq(ptr, ptr)\n"
     ds = ds + "declare ptr @tinh_i32_to_str(i32)\n"
+    ds = ds + "declare ptr @tinh_str_concat(ptr, ptr)\n"  // NEW: String concatenation
     ds = ds + "declare ptr @ptr_array_new()\n"
     ds = ds + "declare void @ptr_array_append(ptr, ptr)\n"
     ds = ds + "declare i32 @ptr_array_len(ptr)\n"

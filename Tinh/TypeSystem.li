@@ -1,6 +1,14 @@
 // TinhLinh Type System
 // Provides type checking and type inference for the compiler
 
+// Normalize type aliases to their concrete types
+func normalize_type_name(ty_name: str): str {
+    if (str_eq(ty_name, "int")) { return "int32" }
+    if (str_eq(ty_name, "uint")) { return "uint32" }
+    if (str_eq(ty_name, "float")) { return "float32" }
+    return ty_name  // Return as-is for other types
+}
+
 // Type kinds
 func TYPE_INT32(): int32 { return 1 }
 func TYPE_STR(): int32 { return 2 }
@@ -231,15 +239,20 @@ func TypeChecker_check_stmt(tc: TypeChecker, node: any) {
     if (kind == STMT_VAR_DECL()) {
         let var_type: Type = Type_new(TYPE_INT32(), "int32")
         if (!str_eq(node.ty_name, "")) {
-            if (str_eq(node.ty_name, "int32")) {
+            // Normalize type aliases first
+            let normalized_type: str = normalize_type_name(node.ty_name)
+            
+            if (str_eq(normalized_type, "int32")) {
                 var_type = Type_new(TYPE_INT32(), "int32")
-            } else if (str_eq(node.ty_name, "str")) {
+            } else if (str_eq(normalized_type, "uint32")) {
+                var_type = Type_new(TYPE_INT32(), "uint32")  // Use int32 kind for now
+            } else if (str_eq(normalized_type, "float32")) {
+                var_type = Type_new(TYPE_FLOAT(), "float32")
+            } else if (str_eq(normalized_type, "str")) {
                 var_type = Type_new(TYPE_STR(), "str")
-            } else if (str_eq(node.ty_name, "bool")) {
+            } else if (str_eq(normalized_type, "bool")) {
                 var_type = Type_new(TYPE_BOOL(), "bool")
-            } else if (str_eq(node.ty_name, "float")) {
-                var_type = Type_new(TYPE_FLOAT(), "float")
-            } else if (str_eq(node.ty_name, "any")) {
+            } else if (str_eq(normalized_type, "any")) {
                 var_type = Type_new(TYPE_ANY(), "any")
             } else {
                 var_type = Type_new(TYPE_STRUCT(), node.ty_name)
@@ -336,12 +349,15 @@ func TypeChecker_check_stmt(tc: TypeChecker, node: any) {
 
 // Main type checking entry point
 func TypeChecker_check_program(tc: TypeChecker, ast: any): bool {
-    // Initialize built-in types
+    // Initialize built-in types (specific types only)
     SymbolTable_define(tc.global_scope, "int32", Type_new(TYPE_INT32(), "int32"))
+    SymbolTable_define(tc.global_scope, "uint32", Type_new(TYPE_INT32(), "uint32"))
+    SymbolTable_define(tc.global_scope, "float32", Type_new(TYPE_FLOAT(), "float32"))
     SymbolTable_define(tc.global_scope, "str", Type_new(TYPE_STR(), "str"))
     SymbolTable_define(tc.global_scope, "bool", Type_new(TYPE_BOOL(), "bool"))
-    SymbolTable_define(tc.global_scope, "float", Type_new(TYPE_FLOAT(), "float"))
     SymbolTable_define(tc.global_scope, "any", Type_new(TYPE_ANY(), "any"))
+    
+    // Note: int, uint, float are handled as aliases in type resolution, not as separate symbols
     
     // Check all statements in AST
     if (ast != 0) {
