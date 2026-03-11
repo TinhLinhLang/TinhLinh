@@ -46,6 +46,7 @@ func COLON(): int32 { return 46 }
 func COMMA(): int32 { return 47 }
 func DOT(): int32 { return 48 }
 func SEMI(): int32 { return 49 }
+func AT(): int32 { return 64 }  // @ symbol for decorators
 
 // Operators
 func ASSIGN(): int32 { return 50 }

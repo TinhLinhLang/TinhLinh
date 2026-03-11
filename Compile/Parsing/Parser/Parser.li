@@ -524,7 +524,19 @@ func Parser_parse_program(p: Parser): any {
     while (!Parser_at_end(p)) {
         let exported: bool = Parser_match(p, EXPORT())
         
-        if (Parser_match(p, IMPORT())) {
+        // Handle @main() decorator
+        if (Parser_match(p, AT())) {
+            let decorator_name: any = Parser_consume(p, IDENTIFIER(), "Expected decorator name after @")
+            if (str_eq(token_lexeme(decorator_name), "main")) {
+                Parser_consume(p, LPAREN(), "Expected '(' after @main")
+                Parser_consume(p, RPAREN(), "Expected ')' after @main(")
+                let body: ASTNode = Parser_parse_block(p)
+                let node: ASTNode = AST_node_new(STMT_MAIN(), token_line(decorator_name), token_col(decorator_name))
+                node.body = body
+                ptr_array_append(stmts, node)
+            }
+        }
+        else if (Parser_match(p, IMPORT())) {
             let path: any = Parser_consume(p, STRING(), "Expected import path")
             let node: ASTNode = AST_node_new(STMT_IMPORT(), token_line(path), token_col(path))
             node.value = token_lexeme(path)

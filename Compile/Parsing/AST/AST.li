@@ -22,6 +22,7 @@ func STMT_SWITCH(): int32 { return 20 }
 func STMT_CASE(): int32 { return 21 }
 func STMT_DEFAULT(): int32 { return 22 }
 func STMT_BREAK(): int32 { return 23 }
+func STMT_MAIN(): int32 { return 24 }  // @main() decorator
 
 export struct ASTNode {
     let n_kind: int32

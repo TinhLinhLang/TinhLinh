@@ -1,0 +1,41 @@
+// Tinh Compiler - Main Entry Point
+// Self-hosting compiler for Tinh Linh language
+
+import "../Compile/Compiler.li"
+
+// @main decorator: Entry point for both Tinh (compiler) and Linh (interpreter)
+// - In Linh: Only runs when this file is the main entry point
+// - In Tinh: Becomes the main() function in LLVM IR
+@main() {
+    let argc: int32 = tinh_argc()
+    
+    if (argc < 2) {
+        print("Tinh Compiler - Self-Hosting Edition v0.1.0")
+        print("Usage: tinh <input.li> [output.ll]")
+        print("")
+        print("Examples:")
+        print("  tinh program.li              # Output to stdout")
+        print("  tinh program.li output.ll    # Output to file")
+    } else {
+        let input_file: str = tinh_argv(1)
+        let output_file: str = ""
+        
+        if (argc >= 3) {
+            output_file = tinh_argv(2)
+        }
+        
+        print("Tinh Compiler v0.1.0")
+        print("Compiling: " + input_file)
+        
+        let success: bool = compile_file(input_file, output_file)
+        
+        if (success) {
+            print("✓ Compilation successful!")
+            if (len(output_file) > 0) {
+                print("Output: " + output_file)
+            }
+        } else {
+            print("✗ Compilation failed!")
+        }
+    }
+}

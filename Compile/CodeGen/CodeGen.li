@@ -628,6 +628,10 @@ func CodeGen_generate_stmt(cg: CodeGen, node: ASTNode) {
         let val: str = CodeGen_generate_expr(cg, node.right)
         CodeGen_emit(cg, "ret " + cg.current_func_return_type + " " + val)
     }
+    else if (kind == STMT_MAIN()) {
+        // @main() is handled in CodeGen_run, not here
+        // This case should not be reached during normal code generation
+    }
 }
 
 func get_llvm_type(ty: str): str {
@@ -711,6 +715,18 @@ func CodeGen_run(cg: CodeGen, stmts: any): str {
     let n: int32 = ptr_array_len(stmts)
     let i: int32 = 0
     
+    // Find @main() decorator if exists
+    let main_node: any = 0
+    i = 0
+    while (i < n) {
+        let node: ASTNode = ptr_array_get(stmts, i)
+        if (node != 0 and node.n_kind == STMT_MAIN()) {
+            main_node = node
+        }
+        i = i + 1
+    }
+    
+    // Generate functions
     let functions: str = ""
     i = 0
     while (i < n) {
@@ -721,18 +737,26 @@ func CodeGen_run(cg: CodeGen, stmts: any): str {
         i = i + 1
     }
     
+    // Generate main() function
     CodeGen_emit_raw(cg, "define i32 @main(i32 %argc, ptr %argv) {")
     CodeGen_emit_raw(cg, "entry:")
     CodeGen_emit(cg, "call void @tinh_runtime_init(i32 %argc, ptr %argv)")
     
-    i = 0
-    while (i < n) {
-        let node: ASTNode = ptr_array_get(stmts, i)
-        if (node != 0 and node.n_kind != STMT_FUNC() and node.n_kind != STMT_STRUCT() and node.n_kind != STMT_IMPORT() and node.n_kind != STMT_ENUM()) {
-            CodeGen_generate_stmt(cg, node)
+    if (main_node != 0) {
+        // Execute @main() block
+        CodeGen_generate_stmt(cg, main_node.body)
+    } else {
+        // Execute all top-level statements (old behavior)
+        i = 0
+        while (i < n) {
+            let node: ASTNode = ptr_array_get(stmts, i)
+            if (node != 0 and node.n_kind != STMT_FUNC() and node.n_kind != STMT_STRUCT() and node.n_kind != STMT_IMPORT() and node.n_kind != STMT_ENUM()) {
+                CodeGen_generate_stmt(cg, node)
+            }
+            i = i + 1
         }
-        i = i + 1
     }
+    
     CodeGen_emit(cg, "ret i32 0")
     CodeGen_emit_raw(cg, "}")
 

@@ -238,6 +238,7 @@ func Lexer_scan_token(l: Lexer): Token {
     if (c == 46) { return token_new(DOT(), ".", l.l_line, l.l_col-1) }
     if (c == 58) { return token_new(COLON(), ":", l.l_line, l.l_col-1) }
     if (c == 59) { return token_new(SEMI(), ";", l.l_line, l.l_col-1) }
+    if (c == 64) { return token_new(AT(), "@", l.l_line, l.l_col-1) }
 
     return token_new(INVALID(), "Unexpected character", l.l_line, l.l_col)
 }
