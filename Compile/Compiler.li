@@ -1,8 +1,33 @@
 import "Parsing/Lexer/Lexer.li"
 import "Parsing/Parser/Parser.li"
 import "CodeGen/CodeGen.li"
+import "Module/ModuleManager.li"
 
 func compile_file(input_path: str, output_path: str): bool {
+    // Extract base directory from input path
+    let base_dir: str = ""
+    let path_len: int32 = len(input_path)
+    let last_slash: int32 = -1
+    let i: int32 = 0
+    while (i < path_len) {
+        let c: int32 = charAt(input_path, i)
+        if (c == 47) {  // '/'
+            last_slash = i
+        } else if (c == 92) {  // '\'
+            last_slash = i
+        }
+        i = i + 1
+    }
+    if (last_slash >= 0) {
+        base_dir = substr(input_path, 0, last_slash)
+    } else {
+        base_dir = "."
+    }
+    
+    // Initialize module manager
+    let mm: ModuleManager = ModuleManager_new(base_dir)
+    
+    // Load and process main file
     let content: str = readFile(input_path)
     if (str_eq(content, "")) {
         print("Error: Could not read file ", input_path)
@@ -12,6 +37,7 @@ func compile_file(input_path: str, output_path: str): bool {
     let total_len: int32 = len(content)
     print("File context length: ", i32_to_str(total_len))
 
+    // Lex and parse main file
     let lexer: Lexer = Lexer_new(content)
     let tokens: TokenArray = Lexer_scan_tokens(lexer)
     
@@ -24,9 +50,74 @@ func compile_file(input_path: str, output_path: str): bool {
     let count: int32 = ptr_array_len(stmts)
     print("Parser found ", i32_to_str(count), " statements.")
 
-    if (count > 0) {
+    // Create main module entry
+    let main_module: Module = Module{input_path, content, tokens, stmts, true}
+    ptr_array_append(mm.modules, main_module)
+    ptr_array_append(mm.module_paths, input_path)
+    
+    // Process imports recursively
+    let to_process: any = ptr_array_new()
+    ptr_array_append(to_process, stmts)
+    
+    while (ptr_array_len(to_process) > 0) {
+        let current_stmts: any = ptr_array_get(to_process, 0)
+        
+        // Remove first element (shift)
+        let new_to_process: any = ptr_array_new()
+        let j: int32 = 1
+        while (j < ptr_array_len(to_process)) {
+            ptr_array_append(new_to_process, ptr_array_get(to_process, j))
+            j = j + 1
+        }
+        to_process = new_to_process
+        
+        // Extract imports from current statements
+        let imports: any = ModuleManager_extract_imports(current_stmts)
+        let import_count: int32 = ptr_array_len(imports)
+        
+        if (import_count > 0) {
+            print("Processing ", i32_to_str(import_count), " imports...")
+        }
+        
+        let k: int32 = 0
+        while (k < import_count) {
+            let import_path: str = ptr_array_get(imports, k)
+            let resolved_path: str = ModuleManager_resolve_path(mm, import_path)
+            
+            // Skip if already processed
+            if (!ModuleManager_has_module(mm, resolved_path)) {
+                print("Loading module: ", import_path)
+                
+                // Load module
+                let mod: Module = ModuleManager_load_module(mm, import_path)
+                
+                // Lex and parse the module
+                let mod_lexer: Lexer = Lexer_new(mod.content)
+                let mod_tokens: TokenArray = Lexer_scan_tokens(mod_lexer)
+                let mod_parser: Parser = Parser_new(mod_tokens)
+                let mod_stmts: any = Parser_parse_program(mod_parser)
+                
+                // Update module with parsed data
+                ModuleManager_update_module(mm, resolved_path, mod_tokens, mod_stmts)
+                
+                // Add to processing queue
+                ptr_array_append(to_process, mod_stmts)
+            }
+            
+            k = k + 1
+        }
+    }
+    
+    // Collect all statements from all modules
+    let all_stmts: any = ModuleManager_collect_all_statements(mm)
+    let total_stmts: int32 = ptr_array_len(all_stmts)
+    let module_count: int32 = ModuleManager_count(mm)
+    
+    print("Processed ", i32_to_str(module_count), " modules with ", i32_to_str(total_stmts), " total statements.")
+
+    if (total_stmts > 0) {
         let cg: CodeGen = CodeGen_new()
-        let ir: str = CodeGen_run(cg, stmts)
+        let ir: str = CodeGen_run(cg, all_stmts)
         writeFile(output_path, ir)
         print("Generated LLVM IR.")
     }

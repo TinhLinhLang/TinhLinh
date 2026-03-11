@@ -40,7 +40,7 @@ Type inference and validation:
 
 ### Basic Type Checking
 
-```tinh
+```li
 // Create type checker
 let tc: TypeChecker = TypeChecker_new()
 
@@ -57,7 +57,7 @@ if (sym.type.kind != TYPE_UNKNOWN()) {
 
 ### Type Inference
 
-```tinh
+```li
 // Create inference context
 let ctx: InferenceContext = InferenceContext_new(tc)
 
@@ -74,7 +74,7 @@ let result: Type = infer_binary_type(left, right, "+")
 
 ### Type Casting
 
-```tinh
+```li
 // Check if cast needed
 let ptr_type: Type = Type_new(TYPE_PTR(), "ptr")
 let int_type: Type = Type_new(TYPE_INT32(), "int32")
@@ -96,7 +96,7 @@ The type system integrates with the compiler pipeline:
 
 ### In CodeGen
 
-```tinh
+```li
 // Get type for expression
 let expr_type: Type = TypeChecker_infer_expr(tc, expr_node)
 
@@ -207,7 +207,7 @@ Type-aware code generation:
 ## Complete Type System Features
 
 ### 1. Type Representation
-```tinh
+```li
 // Basic types
 let int_type: Type = Type_new(TYPE_INT32(), "int32")
 let str_type: Type = Type_new(TYPE_STR(), "str")
@@ -221,7 +221,7 @@ let struct_type: Type = Type_new(TYPE_STRUCT(), "MyStruct")
 ```
 
 ### 2. Symbol Table with Scopes
-```tinh
+```li
 // Global scope
 let global: SymbolTable = SymbolTable_new(0)
 SymbolTable_define(global, "global_var", int_type)
@@ -235,7 +235,7 @@ let sym: Symbol = SymbolTable_lookup(local, "global_var")
 ```
 
 ### 3. Function Signatures
-```tinh
+```li
 // Define function signature
 let sig: FunctionSignature = FunctionSignature_new("add", int_type)
 FunctionSignature_add_param(sig, "a", int_type)
@@ -246,7 +246,7 @@ AdvancedTypeChecker_register_function(atc, sig)
 ```
 
 ### 4. Struct Definitions
-```tinh
+```li
 // Define struct
 let def: StructDefinition = StructDefinition_new("Point")
 StructDefinition_add_field(def, "x", int_type)
@@ -257,7 +257,7 @@ AdvancedTypeChecker_register_struct(atc, def)
 ```
 
 ### 5. Type Inference
-```tinh
+```li
 // Infer from literals
 let type1: Type = infer_literal_type("42")        // int32
 let type2: Type = infer_literal_type("true")      // bool
@@ -269,7 +269,7 @@ let cmp: Type = infer_binary_type(int_type, int_type, "<")     // bool
 ```
 
 ### 6. Type Checking
-```tinh
+```li
 // Create type checker
 let atc: AdvancedTypeChecker = AdvancedTypeChecker_new()
 
@@ -281,7 +281,7 @@ AdvancedTypeChecker_print_results(atc)
 ```
 
 ### 7. Type-Aware Code Generation
-```tinh
+```li
 // Create typed code generator
 let cg: CodeGen = CodeGen_new()
 let atc: AdvancedTypeChecker = AdvancedTypeChecker_new()
@@ -295,7 +295,7 @@ let ir: str = TypedCodeGen_run(tcg, ast)
 
 Complete compiler pipeline with type system:
 
-```tinh
+```li
 import "Parsing/Lexer/Lexer.li"
 import "Parsing/Parser/Parser.li"
 import "Tinh/TypeChecker.li"

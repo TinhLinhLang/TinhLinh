@@ -4,7 +4,7 @@
 
 ### Basic Type Checking
 
-```tinh
+```li
 import "Tinh/TypeSystem.li"
 
 // Create type checker
@@ -23,7 +23,7 @@ if (sym.type.kind != TYPE_UNKNOWN()) {
 
 ### Type Inference
 
-```tinh
+```li
 import "Tinh/TypeInference.li"
 
 // Infer literal types
@@ -39,7 +39,7 @@ print("int32 + int32 = " + Type_to_string(result))
 
 ### Advanced Type Checking
 
-```tinh
+```li
 import "Tinh/TypeChecker.li"
 
 // Create advanced type checker
@@ -67,7 +67,7 @@ AdvancedTypeChecker_print_results(atc)
 
 ### Pattern 1: Variable Type Checking
 
-```tinh
+```li
 func check_variable_declaration(tc: TypeChecker, node: any) {
     // Get declared type
     let var_type: Type = Type_new(TYPE_INT32(), "int32")
@@ -93,7 +93,7 @@ func check_variable_declaration(tc: TypeChecker, node: any) {
 
 ### Pattern 2: Function Call Validation
 
-```tinh
+```li
 func validate_function_call(atc: AdvancedTypeChecker, node: any): Type {
     // Lookup function signature
     let sig: FunctionSignature = AdvancedTypeChecker_lookup_function(atc, node.name)
@@ -129,7 +129,7 @@ func validate_function_call(atc: AdvancedTypeChecker, node: any): Type {
 
 ### Pattern 3: Struct Field Access
 
-```tinh
+```li
 func check_field_access(atc: AdvancedTypeChecker, node: any): Type {
     // Get base type
     let base_type: Type = TypeChecker_infer_expr(atc.type_checker, node.left)
@@ -159,7 +159,7 @@ func check_field_access(atc: AdvancedTypeChecker, node: any): Type {
 
 ### Pattern 4: Type-Aware Code Generation
 
-```tinh
+```li
 func generate_typed_binary_op(tcg: TypedCodeGen, node: any): str {
     // Infer operand types
     let left_type: Type = TypedCodeGen_get_expr_type(tcg, node.left)
@@ -188,7 +188,7 @@ func generate_typed_binary_op(tcg: TypedCodeGen, node: any): str {
 
 ### Step 1: Add Type Checking to Compiler
 
-```tinh
+```li
 import "Compile/Compiler.li"
 import "Tinh/TypeChecker.li"
 
@@ -223,7 +223,7 @@ func compile_file_with_types(input_path: str, output_path: str): bool {
 
 ### Step 2: Use TypedCodeGen
 
-```tinh
+```li
 import "Tinh/TypedCodeGen.li"
 
 func compile_with_typed_codegen(input_path: str, output_path: str): bool {
@@ -255,7 +255,7 @@ func compile_with_typed_codegen(input_path: str, output_path: str): bool {
 
 ### 1. Always Check Return Values
 
-```tinh
+```li
 let sym: Symbol = SymbolTable_lookup(table, "x")
 if (sym.type.kind == TYPE_UNKNOWN()) {
     // Handle undefined variable
@@ -267,7 +267,7 @@ if (sym.type.kind == TYPE_UNKNOWN()) {
 
 ### 2. Use Two-Pass Checking for Forward References
 
-```tinh
+```li
 // Pass 1: Collect all definitions
 let i: int32 = 0
 while (i < n) {
@@ -289,7 +289,7 @@ while (i < n) {
 
 ### 3. Collect All Errors Before Reporting
 
-```tinh
+```li
 // Don't stop at first error
 if (!types_compatible(expected, actual)) {
     TypeChecker_error(tc, "Type mismatch")
@@ -305,7 +305,7 @@ if (TypeChecker_has_errors(tc)) {
 
 ### 4. Use Scopes Properly
 
-```tinh
+```li
 // Enter scope for block
 TypeChecker_enter_scope(tc)
 
@@ -322,7 +322,7 @@ TypeChecker_exit_scope(tc)
 
 ### 5. Cache Type Information
 
-```tinh
+```li
 // Store inferred types to avoid recomputation
 TypedCodeGen_set_expr_type(tcg, expr, inferred_type)
 
@@ -334,7 +334,7 @@ let cached: Type = TypedCodeGen_get_expr_type(tcg, expr)
 
 ### 1. Print Type Information
 
-```tinh
+```li
 func debug_print_type(t: Type) {
     print("Type: " + Type_to_string(t))
     print("  Kind: " + i32_to_str(t.kind))
@@ -345,7 +345,7 @@ func debug_print_type(t: Type) {
 
 ### 2. Trace Symbol Lookup
 
-```tinh
+```li
 func debug_lookup(table: SymbolTable, name: str): Symbol {
     print("Looking up: " + name)
     let sym: Symbol = SymbolTable_lookup(table, name)
@@ -360,7 +360,7 @@ func debug_lookup(table: SymbolTable, name: str): Symbol {
 
 ### 3. Validate AST Structure
 
-```tinh
+```li
 func validate_ast_node(node: any) {
     if (node == 0) {
         print("ERROR: Null AST node")
@@ -378,7 +378,7 @@ func validate_ast_node(node: any) {
 **Cause**: Variable not in symbol table
 
 **Solution**: Ensure variable is defined before use
-```tinh
+```li
 SymbolTable_define(tc.current_scope, var_name, var_type)
 ```
 
@@ -387,7 +387,7 @@ SymbolTable_define(tc.current_scope, var_name, var_type)
 **Cause**: Incompatible types in operation
 
 **Solution**: Check type compatibility or add explicit cast
-```tinh
+```li
 if (!types_compatible(target, source)) {
     if (needs_cast(source, target)) {
         value = generate_cast(source, target, value)
@@ -400,7 +400,7 @@ if (!types_compatible(target, source)) {
 **Cause**: Function call with incorrect arg count
 
 **Solution**: Ensure function signature matches call
-```tinh
+```li
 let param_count: int32 = FunctionSignature_param_count(sig)
 let arg_count: int32 = ptr_array_len(node.args)
 if (arg_count != param_count) {
@@ -413,7 +413,7 @@ if (arg_count != param_count) {
 **Cause**: Struct not registered
 
 **Solution**: Register struct before use
-```tinh
+```li
 let def: StructDefinition = StructDefinition_new("MyStruct")
 // Add fields...
 AdvancedTypeChecker_register_struct(atc, def)
@@ -423,7 +423,7 @@ AdvancedTypeChecker_register_struct(atc, def)
 
 ### 1. Minimize Symbol Lookups
 
-```tinh
+```li
 // Bad: Multiple lookups
 let t1: Type = SymbolTable_lookup(table, "x").type
 let t2: Type = SymbolTable_lookup(table, "x").type
@@ -436,14 +436,14 @@ let t2: Type = sym.type
 
 ### 2. Use Flat Scopes When Possible
 
-```tinh
+```li
 // Avoid deep nesting
 // Prefer flat function-level scopes
 ```
 
 ### 3. Cache Frequently Used Types
 
-```tinh
+```li
 // Create once, reuse
 let int_type: Type = Type_new(TYPE_INT32(), "int32")
 let str_type: Type = Type_new(TYPE_STR(), "str")
@@ -451,7 +451,7 @@ let str_type: Type = Type_new(TYPE_STR(), "str")
 
 ## Testing Your Type System Integration
 
-```tinh
+```li
 // Test basic types
 func test_basic() {
     let tc: TypeChecker = TypeChecker_new()

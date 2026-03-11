@@ -82,6 +82,15 @@ func TypeInfo_init_runtime(ti: TypeInfo) {
 
 func get_llvm_type_from_tinh(ty: str): str {
     if (str_eq(ty, "int32") or str_eq(ty, "bool") or str_eq(ty, "i32") or str_eq(ty, "i1")) { return "i32" }
+    if (str_eq(ty, "int8") or str_eq(ty, "i8")) { return "i8" }
+    if (str_eq(ty, "int16") or str_eq(ty, "i16")) { return "i16" }
+    if (str_eq(ty, "int64") or str_eq(ty, "i64")) { return "i64" }
+    if (str_eq(ty, "uint8")) { return "i8" }
+    if (str_eq(ty, "uint16")) { return "i16" }
+    if (str_eq(ty, "uint32")) { return "i32" }
+    if (str_eq(ty, "uint64")) { return "i64" }
+    if (str_eq(ty, "float32")) { return "float" }
+    if (str_eq(ty, "float64") or str_eq(ty, "double")) { return "double" }
     if (str_eq(ty, "str") or str_eq(ty, "any") or str_eq(ty, "ptr")) { return "ptr" }
     if (str_eq(ty, "void") or str_eq(ty, "")) { return "void" }
     return "ptr"  // Custom types are pointers

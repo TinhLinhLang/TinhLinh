@@ -1,8 +1,7 @@
 func EOF(): int32 { return 0 }
 func IDENTIFIER(): int32 { return 1 }
-func NUMBER(): int32 { return 2 }
-func STRING(): int32 { return 3 }
-func INVALID(): int32 { return 4 }
+func STRING(): int32 { return 2 }
+func INVALID(): int32 { return 3 }
 
 // Keywords
 func VAR(): int32 { return 10 }
@@ -22,6 +21,9 @@ func BREAK(): int32 { return 23 }
 func CONTINUE(): int32 { return 24 }
 func TRUE(): int32 { return 25 }
 func FALSE(): int32 { return 26 }
+func SWITCH(): int32 { return 27 }
+func CASE(): int32 { return 28 }
+func DEFAULT(): int32 { return 29 }
 
 // Types
 func INT_KW(): int32 { return 30 }
@@ -63,3 +65,17 @@ func OR(): int32 { return 63 }
 
 // More keywords
 func SKIP(): int32 { return 70 }
+
+// Extended integer types
+func INT8_KW(): int32 { return 80 }
+func INT16_KW(): int32 { return 81 }
+func INT32_KW(): int32 { return 82 }
+func INT64_KW(): int32 { return 83 }
+func UINT8_KW(): int32 { return 84 }
+func UINT16_KW(): int32 { return 85 }
+func UINT32_KW(): int32 { return 86 }
+func UINT64_KW(): int32 { return 87 }
+
+// Extended float types
+func FLOAT32_KW(): int32 { return 88 }
+func FLOAT64_KW(): int32 { return 89 }

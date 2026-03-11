@@ -1,0 +1,87 @@
+import "Parsing/Lexer/Lexer.li"
+import "Parsing/Parser/Parser.li"
+import "CodeGen/CodeGen.li"
+import "Module/ModuleManager.li"
+
+func get_base_dir(input_path: str): str {
+    let path_len: int32 = len(input_path)
+    let base_dir: str = ""
+    let last_slash: int32 = -1
+    let i: int32 = 0
+    while (i < path_len) {
+        let c: int32 = charAt(input_path, i)
+        if (c == 47) {  // '/'
+            last_slash = i
+        }
+        if (c == 92) {  // '\'
+            last_slash = i
+        }
+        i = i + 1
+    }
+    if (last_slash >= 0) {
+        base_dir = substr(input_path, 0, last_slash)
+    }
+    return base_dir
+}
+
+func compile_file(input_path: str, output_path: str): bool {
+    let input: str = readFile(input_path)
+    if (len(input) == 0) {
+        print("Error: Could not read file ", input_path)
+        return false
+    }
+    
+    print("File context length: ", i32_to_str(len(input)))
+    
+    let base_dir: str = get_base_dir(input_path)
+    let mm: ModuleManager = ModuleManager_new(base_dir)
+    
+    let lexer: Lexer = Lexer_new(input)
+    let tokens: any = Lexer_scan_tokens(lexer)
+    print("Lexer found ", i32_to_str(token_array_len(tokens)), " tokens.")
+    
+    let parser: Parser = Parser_new(tokens)
+    let stmts: any = Parser_parse_program(parser)
+    print("Parser found ", i32_to_str(ptr_array_len(stmts)), " statements.")
+    
+    let imports: any = ModuleManager_extract_imports(stmts)
+    let n_imports: int32 = ptr_array_len(imports)
+    if (n_imports > 0) {
+        print("Processing ", i32_to_str(n_imports), " imports...")
+        let i: int32 = 0
+        while (i < n_imports) {
+            let import_path: str = ptr_array_get(imports, i)
+            print("Loading module: ", import_path)
+            let mod: any = ModuleManager_load_module(mm, import_path)
+            i = i + 1
+        }
+    }
+    
+    let all_stmts: any = ModuleManager_collect_all_statements(mm)
+    print("Processed ", i32_to_str(ModuleManager_count(mm)), " modules with ", i32_to_str(ptr_array_len(all_stmts)), " total statements.")
+    
+    let cg: CodeGen = CodeGen_new()
+    let ir: str = CodeGen_run(cg, all_stmts)
+    print("Generated LLVM IR.")
+    
+    writeFile(output_path, ir)
+    return true
+}
+
+let argc: int32 = tinh_argc()
+if (argc < 2) {
+    print("Usage: compiler <input.li> [output.ll]")
+} else {
+    let input_path: str = tinh_argv(1)
+    let output_path: str = "output.ll"
+    if (argc >= 3) {
+        output_path = tinh_argv(2)
+    }
+    
+    let success: bool = compile_file(input_path, output_path)
+    if (success) {
+        print("Compilation successful!")
+    } else {
+        print("Compilation failed!")
+    }
+}

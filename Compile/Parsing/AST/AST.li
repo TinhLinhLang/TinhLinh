@@ -18,6 +18,10 @@ func STMT_STRUCT(): int32 { return 16 }
 func STMT_ENUM(): int32 { return 17 }
 func STMT_IMPORT(): int32 { return 18 }
 func STMT_RETURN(): int32 { return 19 }
+func STMT_SWITCH(): int32 { return 20 }
+func STMT_CASE(): int32 { return 21 }
+func STMT_DEFAULT(): int32 { return 22 }
+func STMT_BREAK(): int32 { return 23 }
 
 export struct ASTNode {
     let n_kind: int32

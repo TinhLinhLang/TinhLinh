@@ -103,17 +103,17 @@ Source → Lexer → Parser → AdvancedTypeChecker → TypedCodeGen → LLVM IR
 ### Step 2: Integrate Basic Type Checking
 
 1. **Import type system**:
-   ```tinh
+   ```li
    import "../Tinh/TypeSystem.li"
    ```
 
 2. **Create type checker**:
-   ```tinh
+   ```li
    var tc: TypeChecker = TypeChecker_new()
    ```
 
 3. **Check program**:
-   ```tinh
+   ```li
    var success: bool = TypeChecker_check_program(tc, stmts)
    if (!success) {
        TypeChecker_print_errors(tc)
@@ -124,17 +124,17 @@ Source → Lexer → Parser → AdvancedTypeChecker → TypedCodeGen → LLVM IR
 ### Step 3: Add Advanced Type Checking
 
 1. **Import advanced modules**:
-   ```tinh
+   ```li
    import "../Tinh/TypeChecker.li"
    ```
 
 2. **Create advanced type checker**:
-   ```tinh
+   ```li
    var atc: AdvancedTypeChecker = AdvancedTypeChecker_new()
    ```
 
 3. **Check with validation**:
-   ```tinh
+   ```li
    var success: bool = AdvancedTypeChecker_check_program(atc, stmts)
    AdvancedTypeChecker_print_results(atc)
    ```
@@ -142,17 +142,17 @@ Source → Lexer → Parser → AdvancedTypeChecker → TypedCodeGen → LLVM IR
 ### Step 4: Enable Type-Aware Code Generation
 
 1. **Import typed codegen**:
-   ```tinh
+   ```li
    import "../Tinh/TypedCodeGen.li"
    ```
 
 2. **Create typed code generator**:
-   ```tinh
+   ```li
    var tcg: TypedCodeGen = TypedCodeGen_new(cg, atc)
    ```
 
 3. **Generate code**:
-   ```tinh
+   ```li
    var ir: str = TypedCodeGen_run(tcg, stmts)
    ```
 
@@ -197,7 +197,7 @@ Source → Lexer → Parser → AdvancedTypeChecker → TypedCodeGen → LLVM IR
 ## Example: Modifying Existing Compiler
 
 ### Before (Compiler.li)
-```tinh
+```li
 import "Parsing/Lexer/Lexer.li"
 import "Parsing/Parser/Parser.li"
 import "CodeGen/CodeGen.li"
@@ -217,7 +217,7 @@ func compile_file(input_path: str, output_path: str): bool {
 ```
 
 ### After (with Type Checking)
-```tinh
+```li
 import "Parsing/Lexer/Lexer.li"
 import "Parsing/Parser/Parser.li"
 import "CodeGen/CodeGen.li"
@@ -305,7 +305,7 @@ Solution: Check import paths are correct
 
 ### Issue: Import not found
 **Solution**: Use relative paths from compiler location
-```tinh
+```li
 import "../Tinh/TypeSystem.li"  // Correct
 import "Tinh/TypeSystem.li"     // Wrong
 ```
@@ -318,7 +318,7 @@ import "Tinh/TypeSystem.li"     // Wrong
 
 ### Issue: False type errors
 **Solution**: Check type annotations are correct
-```tinh
+```li
 var x: int32 = 42        // Correct
 var x: str = 42          // Type error
 ```

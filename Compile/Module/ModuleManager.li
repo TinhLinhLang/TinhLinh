@@ -1,0 +1,139 @@
+// Module Manager for handling imports and dependencies
+
+import "../Parsing/AST/AST.li"
+
+export struct Module {
+    let path: str           // Module file path
+    let content: str        // Module source code
+    let tokens: any         // TokenArray
+    let stmts: any          // Parsed statements
+    let is_processed: bool  // Whether module has been processed
+}
+
+export struct ModuleManager {
+    let modules: any        // Array of Module
+    let module_paths: any   // Array of processed paths (for deduplication)
+    let base_path: str      // Base directory for resolving relative imports
+}
+
+func ModuleManager_new(base_path: str): ModuleManager {
+    return ModuleManager{ptr_array_new(), ptr_array_new(), base_path}
+}
+
+// Check if module has been loaded
+func ModuleManager_has_module(mm: ModuleManager, path: str): bool {
+    let n: int32 = ptr_array_len(mm.module_paths)
+    let i: int32 = 0
+    while (i < n) {
+        let p: str = ptr_array_get(mm.module_paths, i)
+        if (str_eq(p, path)) {
+            return true
+        }
+        i = i + 1
+    }
+    return false
+}
+
+// Resolve relative path to absolute path
+func ModuleManager_resolve_path(mm: ModuleManager, import_path: str): str {
+    // For now, simple concatenation
+    // TODO: Handle .. and . properly
+    return mm.base_path + "/" + import_path
+}
+
+// Load a module from file
+func ModuleManager_load_module(mm: ModuleManager, import_path: str): Module {
+    let resolved_path: str = ModuleManager_resolve_path(mm, import_path)
+    
+    // Check if already loaded
+    if (ModuleManager_has_module(mm, resolved_path)) {
+        // Return existing module
+        let n: int32 = ptr_array_len(mm.modules)
+        let i: int32 = 0
+        while (i < n) {
+            let m: Module = ptr_array_get(mm.modules, i)
+            if (str_eq(m.path, resolved_path)) {
+                return m
+            }
+            i = i + 1
+        }
+    }
+    
+    // Load new module
+    let content: str = readFile(resolved_path)
+    let module: Module = Module{resolved_path, content, 0, 0, false}
+    
+    // Add to cache
+    ptr_array_append(mm.modules, module)
+    ptr_array_append(mm.module_paths, resolved_path)
+    
+    return module
+}
+
+// Get all modules
+func ModuleManager_get_modules(mm: ModuleManager): any {
+    return mm.modules
+}
+
+// Get module count
+func ModuleManager_count(mm: ModuleManager): int32 {
+    return ptr_array_len(mm.modules)
+}
+
+// Update module with parsed tokens and statements
+func ModuleManager_update_module(mm: ModuleManager, path: str, tokens: any, stmts: any): void {
+    let n: int32 = ptr_array_len(mm.modules)
+    let i: int32 = 0
+    while (i < n) {
+        let m: Module = ptr_array_get(mm.modules, i)
+        if (str_eq(m.path, path)) {
+            m.tokens = tokens
+            m.stmts = stmts
+            m.is_processed = true
+            return
+        }
+        i = i + 1
+    }
+}
+
+// Extract import paths from statements
+func ModuleManager_extract_imports(stmts: any): any {
+    let imports: any = ptr_array_new()
+    let n: int32 = ptr_array_len(stmts)
+    let i: int32 = 0
+    while (i < n) {
+        let node: ASTNode = ptr_array_get(stmts, i)
+        if (node != 0 and node.n_kind == STMT_IMPORT()) {
+            ptr_array_append(imports, node.value)
+        }
+        i = i + 1
+    }
+    return imports
+}
+
+// Collect all statements from all modules (excluding imports)
+func ModuleManager_collect_all_statements(mm: ModuleManager): any {
+    let all_stmts: any = ptr_array_new()
+    let n: int32 = ptr_array_len(mm.modules)
+    let i: int32 = 0
+    
+    while (i < n) {
+        let m: Module = ptr_array_get(mm.modules, i)
+        if (m.is_processed) {
+            let stmts: any = m.stmts
+            let j: int32 = 0
+            let stmt_count: int32 = ptr_array_len(stmts)
+            while (j < stmt_count) {
+                let node: ASTNode = ptr_array_get(stmts, j)
+                // Skip import statements - they're already processed
+                if (node != 0 and node.n_kind != STMT_IMPORT()) {
+                    ptr_array_append(all_stmts, node)
+                }
+                j = j + 1
+            }
+        }
+        i = i + 1
+    }
+    
+    return all_stmts
+}

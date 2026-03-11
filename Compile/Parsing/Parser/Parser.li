@@ -57,12 +57,6 @@ func Parser_parse_primary(p: Parser): ASTNode {
     let tok: any = Parser_peek(p)
     let kind_id: int32 = token_type(tok)
     
-    if (kind_id == NUMBER()) {
-        Parser_advance(p)
-        let n: ASTNode = AST_node_new(EXPR_LITERAL(), token_line(tok), token_col(tok))
-        n.value = token_lexeme(tok)
-        return n
-    }
     if (kind_id == STRING()) {
         Parser_advance(p)
         let n: ASTNode = AST_node_new(EXPR_LITERAL(), token_line(tok), token_col(tok))
@@ -82,9 +76,22 @@ func Parser_parse_primary(p: Parser): ASTNode {
         return n
     }
     if (kind_id == IDENTIFIER()) {
+        let lexeme: str = token_lexeme(tok)
+        // Check if it's a number (starts with digit)
+        if (len(lexeme) > 0) {
+            let first_char: int32 = charAt(lexeme, 0)
+            if (first_char >= 48 and first_char <= 57) {
+                // It's a number literal
+                Parser_advance(p)
+                let n: ASTNode = AST_node_new(EXPR_LITERAL(), token_line(tok), token_col(tok))
+                n.value = lexeme
+                return n
+            }
+        }
+        // It's a variable
         Parser_advance(p)
         let n: ASTNode = AST_node_new(EXPR_VARIABLE(), token_line(tok), token_col(tok))
-        n.name = token_lexeme(tok)
+        n.name = lexeme
         return n
     }
     if (kind_id == LPAREN()) {
@@ -146,7 +153,14 @@ func Parser_parse_call(p: Parser): ASTNode {
 }
 
 func Parser_parse_unary(p: Parser): ASTNode {
-    if (Parser_match(p, BANG()) or Parser_match(p, MINUS())) {
+    if (Parser_match(p, BANG())) {
+        let tok: any = token_array_get(p.p_tokens, p.p_current - 1)
+        let right: ASTNode = Parser_parse_unary(p)
+        let node: ASTNode = AST_node_new(EXPR_UNARY(), token_line(tok), token_col(tok))
+        node.value = token_lexeme(tok)
+        node.right = right
+        return node
+    } else if (Parser_match(p, MINUS())) {
         let tok: any = token_array_get(p.p_tokens, p.p_current - 1)
         let right: ASTNode = Parser_parse_unary(p)
         let node: ASTNode = AST_node_new(EXPR_UNARY(), token_line(tok), token_col(tok))
@@ -159,7 +173,16 @@ func Parser_parse_unary(p: Parser): ASTNode {
 
 func Parser_parse_mul(p: Parser): ASTNode {
     let expr: ASTNode = Parser_parse_unary(p)
-    while (Parser_match(p, STAR()) or Parser_match(p, SLASH())) {
+    while (Parser_match(p, STAR())) {
+        let tok: any = token_array_get(p.p_tokens, p.p_current - 1)
+        let right: ASTNode = Parser_parse_unary(p)
+        let node: ASTNode = AST_node_new(EXPR_BINARY(), expr.n_line, expr.n_col)
+        node.value = token_lexeme(tok)
+        node.left = expr
+        node.right = right
+        expr = node
+    }
+    while (Parser_match(p, SLASH())) {
         let tok: any = token_array_get(p.p_tokens, p.p_current - 1)
         let right: ASTNode = Parser_parse_unary(p)
         let node: ASTNode = AST_node_new(EXPR_BINARY(), expr.n_line, expr.n_col)
@@ -213,8 +236,36 @@ func Parser_parse_eq(p: Parser): ASTNode {
     return expr
 }
 
-func Parser_parse_assignment(p: Parser): ASTNode {
+func Parser_parse_and(p: Parser): ASTNode {
     let expr: ASTNode = Parser_parse_eq(p)
+    while (Parser_match(p, AND())) {
+        let tok: any = token_array_get(p.p_tokens, p.p_current - 1)
+        let right: ASTNode = Parser_parse_eq(p)
+        let node: ASTNode = AST_node_new(EXPR_BINARY(), expr.n_line, expr.n_col)
+        node.value = "and"
+        node.left = expr
+        node.right = right
+        expr = node
+    }
+    return expr
+}
+
+func Parser_parse_or(p: Parser): ASTNode {
+    let expr: ASTNode = Parser_parse_and(p)
+    while (Parser_match(p, OR())) {
+        let tok: any = token_array_get(p.p_tokens, p.p_current - 1)
+        let right: ASTNode = Parser_parse_and(p)
+        let node: ASTNode = AST_node_new(EXPR_BINARY(), expr.n_line, expr.n_col)
+        node.value = "or"
+        node.left = expr
+        node.right = right
+        expr = node
+    }
+    return expr
+}
+
+func Parser_parse_assignment(p: Parser): ASTNode {
+    let expr: ASTNode = Parser_parse_or(p)
     if (Parser_match(p, ASSIGN())) {
         let value: ASTNode = Parser_parse_assignment(p)
         if (expr.n_kind == EXPR_VARIABLE()) {
@@ -278,6 +329,56 @@ func Parser_parse_while(p: Parser): ASTNode {
     return node
 }
 
+func Parser_parse_switch(p: Parser): ASTNode {
+    let tok: any = token_array_get(p.p_tokens, p.p_current - 1)
+    Parser_consume(p, LPAREN(), "Expected '(' after switch")
+    let expr: ASTNode = Parser_parse_expression(p)
+    Parser_consume(p, RPAREN(), "Expected ')' after switch expression")
+    Parser_consume(p, LBRACE(), "Expected '{' after switch")
+    
+    let cases: any = ptr_array_new()
+    while (!Parser_check(p, RBRACE()) and !Parser_at_end(p)) {
+        if (Parser_match(p, CASE())) {
+            // Parse case value as primary expression only (no calls/struct inits)
+            let case_value: ASTNode = Parser_parse_primary(p)
+            Parser_consume(p, COLON(), "Expected ':' after case value")
+            let case_body: any = ptr_array_new()
+            // Parse statements until we hit another case, default, or end of switch
+            while (!Parser_check(p, CASE()) and !Parser_check(p, DEFAULT()) and !Parser_check(p, RBRACE()) and !Parser_at_end(p)) {
+                let stmt: ASTNode = Parser_parse_statement(p)
+                ptr_array_append(case_body, stmt)
+            }
+            let case_node: ASTNode = AST_node_new(STMT_CASE(), token_line(tok), token_col(tok))
+            case_node.left = case_value
+            case_node.args = case_body
+            ptr_array_append(cases, case_node)
+        } else if (Parser_match(p, DEFAULT())) {
+            Parser_consume(p, COLON(), "Expected ':' after default")
+            let default_body: any = ptr_array_new()
+            // Parse statements until end of switch
+            while (!Parser_check(p, RBRACE()) and !Parser_at_end(p)) {
+                let stmt: ASTNode = Parser_parse_statement(p)
+                ptr_array_append(default_body, stmt)
+            }
+            let default_node: ASTNode = AST_node_new(STMT_DEFAULT(), token_line(tok), token_col(tok))
+            default_node.args = default_body
+            ptr_array_append(cases, default_node)
+        } else {
+            // If we encounter something unexpected, try to parse it as a statement
+            // This might be an error, but let's be graceful
+            print("Parser Error: Expected 'case' or 'default' in switch body at line ", i32_to_str(token_line(Parser_peek(p))))
+            Parser_advance(p)  // Skip the unexpected token
+        }
+    }
+    
+    Parser_consume(p, RBRACE(), "Expected '}' after switch body")
+    
+    let switch_node: ASTNode = AST_node_new(STMT_SWITCH(), token_line(tok), token_col(tok))
+    switch_node.condition = expr
+    switch_node.args = cases
+    return switch_node
+}
+
 func Parser_parse_function(p: Parser, exported: bool): ASTNode {
     let tok: any = Parser_consume(p, IDENTIFIER(), "Expected function name")
     Parser_consume(p, LPAREN(), "Expected '(' after function name")
@@ -286,10 +387,10 @@ func Parser_parse_function(p: Parser, exported: bool): ASTNode {
         while (true) {
             let pn: any = Parser_consume(p, IDENTIFIER(), "Expected parameter name")
             Parser_consume(p, COLON(), "Expected ':' after parameter name")
-            let pt: any = Parser_consume(p, IDENTIFIER(), "Expected parameter type")
+            let pt: str = Parser_parse_type(p)
             let pd: ASTNode = AST_node_new(STMT_VAR_DECL(), token_line(pn), token_col(pn))
             pd.name = token_lexeme(pn)
-            pd.ty_name = token_lexeme(pt)
+            pd.ty_name = pt
             ptr_array_append(params, pd)
             if (!Parser_match(p, COMMA())) { break }
         }
@@ -297,8 +398,7 @@ func Parser_parse_function(p: Parser, exported: bool): ASTNode {
     Parser_consume(p, RPAREN(), "Expected ')' after parameters")
     let ret_ty: str = ""
     if (Parser_match(p, COLON())) {
-        let rt: any = Parser_consume(p, IDENTIFIER(), "Expected return type")
-        ret_ty = token_lexeme(rt)
+        ret_ty = Parser_parse_type(p)
     }
     let body: ASTNode = Parser_parse_block(p)
     let node: ASTNode = AST_node_new(STMT_FUNC(), token_line(tok), token_col(tok))
@@ -344,6 +444,24 @@ func Parser_parse_enum(p: Parser, exported: bool): ASTNode {
     return node
 }
 
+func Parser_parse_type(p: Parser): str {
+    let tok: any = Parser_peek(p)
+    let kind: int32 = token_type(tok)
+    
+    // Accept IDENTIFIER or any type keyword
+    if (kind == IDENTIFIER() or 
+        kind == INT8_KW() or kind == INT16_KW() or kind == INT32_KW() or kind == INT64_KW() or
+        kind == UINT8_KW() or kind == UINT16_KW() or kind == UINT32_KW() or kind == UINT64_KW() or
+        kind == FLOAT32_KW() or kind == FLOAT64_KW() or
+        kind == STR_KW() or kind == BOOL_KW() or kind == VOID_KW() or kind == ANY_KW()) {
+        Parser_advance(p)
+        return token_lexeme(tok)
+    }
+    
+    print("Parser Error: Expected type name at line ", i32_to_str(token_line(tok)))
+    return ""
+}
+
 func Parser_parse_statement(p: Parser): ASTNode {
     if (Parser_check(p, LBRACE())) {
         return Parser_parse_block(p)
@@ -353,6 +471,14 @@ func Parser_parse_statement(p: Parser): ASTNode {
     }
     if (Parser_match(p, WHILE())) {
         return Parser_parse_while(p)
+    }
+    if (Parser_match(p, SWITCH())) {
+        return Parser_parse_switch(p)
+    }
+    if (Parser_match(p, BREAK())) {
+        let tok: any = token_array_get(p.p_tokens, p.p_current - 1)
+        Parser_match(p, SEMI())
+        return AST_node_new(STMT_BREAK(), token_line(tok), token_col(tok))
     }
     if (Parser_match(p, RETURN())) {
         let tok: any = token_array_get(p.p_tokens, p.p_current - 1)
@@ -371,8 +497,7 @@ func Parser_parse_statement(p: Parser): ASTNode {
         let name: any = Parser_consume(p, IDENTIFIER(), "Expected identifier after storage keyword")
         let ty: str = ""
         if (Parser_match(p, COLON())) {
-            let t_tok: any = Parser_consume(p, IDENTIFIER(), "Expected type name")
-            ty = token_lexeme(t_tok)
+            ty = Parser_parse_type(p)
         }
         let init: any = 0
         if (Parser_match(p, ASSIGN())) {
