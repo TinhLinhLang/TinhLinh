@@ -114,7 +114,7 @@ Compile a Lithium (.li) source file to native code:
 
 ```sh
 # Compile to LLVM IR
-./build/Tinh/MiniTinhCompiler.exe your_program.li output.ll
+tinh your_program.li output.ll
 
 # Compile LLVM IR to object file
 llc -filetype=obj output.ll -o output.obj
