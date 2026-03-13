@@ -81,7 +81,7 @@ func test_type_strings() {
     print("any -> ", Type_to_string(TYPE_ANY()))
 }
 
-func main(): int32 {
+@main(): int32 {
     print("========================================")
     print("  Minimal Type System Test")
     print("========================================")

@@ -12,7 +12,7 @@ func test_string(): str {
     return msg
 }
 
-func main(): int32 {
+@main(): int32 {
     print("=== MiniTinhCompiler Test ===")
     
     let result: int32 = test_basic()

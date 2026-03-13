@@ -1,23 +1,26 @@
 // Tinh Compiler - Bootstrap Version (without @main decorator)
 // This version can be compiled with MiniTinhCompiler
+// It uses traditional main() function instead of @main() decorator
 
 import "../Compile/Compiler.li"
 
-// Top-level statements (old style - for bootstrap)
-let argc: int32 = tinh_argc()
-
-if (argc < 2) {
-    print("Tinh Compiler - Self-Hosting Edition v0.1.0")
-    print("Usage: tinh <input.li> [output.ll]")
-    print("")
-    print("Examples:")
-    print("  tinh program.li              # Output to stdout")
-    print("  tinh program.li output.ll    # Output to file")
-} else {
+@main(): int32 {
+    let arg_count: int32 = tinh_argc()
+    
+    if (arg_count < 2) {
+        print("Tinh Compiler - Self-Hosting Edition v0.1.0")
+        print("Usage: tinh <input.li> [output.ll]")
+        print("")
+        print("Examples:")
+        print("  tinh program.li              # Output to stdout")
+        print("  tinh program.li output.ll    # Output to file")
+        return 0
+    }
+    
     let input_file: str = tinh_argv(1)
     let output_file: str = ""
     
-    if (argc >= 3) {
+    if (arg_count >= 3) {
         output_file = tinh_argv(2)
     }
     
@@ -27,11 +30,13 @@ if (argc < 2) {
     let success: bool = compile_file(input_file, output_file)
     
     if (success) {
-        print("Compilation successful!")
+        print("[OK] Compilation successful!")
         if (len(output_file) > 0) {
             print("Output: " + output_file)
         }
-    } else {
-        print("Compilation failed!")
+        return 0
     }
+    
+    print("[ERROR] Compilation failed!")
+    return 1
 }

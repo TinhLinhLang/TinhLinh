@@ -7,9 +7,9 @@ import "../Compile/Compiler.li"
 // - In Linh: Only runs when this file is the main entry point
 // - In Tinh: Becomes the main() function in LLVM IR
 @main() {
-    let argc: int32 = tinh_argc()
+    let arg_count: int32 = tinh_argc()
     
-    if (argc < 2) {
+    if (arg_count < 2) {
         print("Tinh Compiler - Self-Hosting Edition v0.1.0")
         print("Usage: tinh <input.li> [output.ll]")
         print("")
@@ -20,7 +20,7 @@ import "../Compile/Compiler.li"
         let input_file: str = tinh_argv(1)
         let output_file: str = ""
         
-        if (argc >= 3) {
+        if (arg_count >= 3) {
             output_file = tinh_argv(2)
         }
         
@@ -30,12 +30,12 @@ import "../Compile/Compiler.li"
         let success: bool = compile_file(input_file, output_file)
         
         if (success) {
-            print("✓ Compilation successful!")
+            print("[OK] Compilation successful!")
             if (len(output_file) > 0) {
                 print("Output: " + output_file)
             }
         } else {
-            print("✗ Compilation failed!")
+            print("[ERROR] Compilation failed!")
         }
     }
 }
