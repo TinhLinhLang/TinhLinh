@@ -1,0 +1,34 @@
+// Pure Tinh Linked List Implementation
+// No malloc/free needed - uses struct fields only!
+// This is truly self-hosting!
+
+// Node structure
+export struct ListNode {
+    let value: any
+    let next: ListNode
+}
+
+// List structure
+export struct List {
+    let head: ListNode
+    let tail: ListNode
+    let length: int32
+}
+
+// Create new empty list
+export func List_new(): List {
+    return List{0, 0, 0}
+}
+
+// Append item to list
+export func List_append(list: List, item: any) {
+    // Create new node (this allocates on stack, then we need to "persist" it)
+    // PROBLEM: Struct on stack will be destroyed when function returns!
+    // We need heap allocation...
+    
+    // This is the fundamental problem:
+    // Without malloc, we can't create persistent data structures
+    // that outlive function scope
+}
+
+// This approach won't work without heap allocation

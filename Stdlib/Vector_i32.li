@@ -1,0 +1,104 @@
+// Vector_i32 - Dynamic Array for int32 (non-generic version for bootstrap)
+// This is a simplified version without generics for the bootstrap compiler
+
+export struct Vector_i32 {
+    let data: any       // Pointer to vector data
+    let length: int32   // Current number of elements
+    let capacity: int32 // Allocated capacity
+}
+
+// Create new empty vector
+export func Vector_new_i32(): Vector_i32 {
+    let initial_capacity: int32 = 10
+    let size_bytes: int32 = initial_capacity * 8
+    let data: any = malloc(size_bytes)
+    return Vector_i32{data, 0, initial_capacity}
+}
+
+// Get length
+export func Vector_len_i32(arr: Vector_i32): int32 {
+    return arr.length
+}
+
+// Get element at index
+export func Vector_get_i32(arr: Vector_i32, index: int32): int32 {
+    if (index < 0 or index >= arr.length) {
+        print("Error: Array index out of bounds")
+        return 0
+    }
+    
+    let offset: int32 = index * 8
+    let elem_ptr: any = tinh_ptr_add(arr.data, offset)
+    let elem_any: any = tinh_ptr_load(elem_ptr)
+    // Convert pointer back to int32
+    return 0  // TODO: proper conversion
+}
+
+// Set element at index
+export func Vector_set_i32(arr: Vector_i32, index: int32, value: int32) {
+    if (index < 0 or index >= arr.length) {
+        print("Error: Array index out of bounds")
+        return
+    }
+    
+    let offset: int32 = index * 8
+    let elem_ptr: any = tinh_ptr_add(arr.data, offset)
+    let value_ptr: any = tinh_i32_to_ptr(value)
+    tinh_ptr_store(elem_ptr, value_ptr)
+}
+
+// Push element
+export func Vector_push_i32(arr: Vector_i32, value: int32) {
+    if (arr.length >= arr.capacity) {
+        // Grow capacity
+        let new_capacity: int32 = arr.capacity * 2
+        let new_size_bytes: int32 = new_capacity * 8
+        let new_data: any = malloc(new_size_bytes)
+        
+        // Copy old data
+        let i: int32 = 0
+        while (i < arr.length) {
+            let old_offset: int32 = i * 8
+            let new_offset: int32 = i * 8
+            let old_ptr: any = tinh_ptr_add(arr.data, old_offset)
+            let new_ptr: any = tinh_ptr_add(new_data, new_offset)
+            let value_old: any = tinh_ptr_load(old_ptr)
+            tinh_ptr_store(new_ptr, value_old)
+            i = i + 1
+        }
+        
+        free(arr.data)
+        arr.data = new_data
+        arr.capacity = new_capacity
+    }
+    
+    let offset: int32 = arr.length * 8
+    let elem_ptr: any = tinh_ptr_add(arr.data, offset)
+    let value_ptr: any = tinh_i32_to_ptr(value)
+    tinh_ptr_store(elem_ptr, value_ptr)
+    arr.length = arr.length + 1
+}
+
+// Pop element
+export func Vector_pop_i32(arr: Vector_i32): int32 {
+    if (arr.length == 0) {
+        print("Error: Cannot pop from empty array")
+        return 0
+    }
+    
+    arr.length = arr.length - 1
+    let offset: int32 = arr.length * 8
+    let elem_ptr: any = tinh_ptr_add(arr.data, offset)
+    let elem_any: any = tinh_ptr_load(elem_ptr)
+    return 0  // TODO: proper conversion
+}
+
+// Drop/free vector
+export func Vector_drop_i32(arr: Vector_i32) {
+    if (arr.data != tinh_i32_to_ptr(0)) {
+        free(arr.data)
+        arr.data = tinh_i32_to_ptr(0)
+        arr.length = 0
+        arr.capacity = 0
+    }
+}

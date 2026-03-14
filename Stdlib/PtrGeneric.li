@@ -1,0 +1,62 @@
+// Ptr<T> - Generic Owned Pointer (like Box<T> in Rust)
+// Type-safe pointer with ownership semantics
+// Uses minimal runtime: malloc, free, tinh_ptr_load, tinh_ptr_store
+
+// Generic owned pointer structure
+export struct Ptr<T> {
+    let data: any       // Internal pointer (untyped at runtime)
+    let is_valid: bool  // Track if pointer is valid (for move semantics)
+}
+
+// Create new owned pointer with value
+export func Ptr_new<T>(value: T): Ptr<T> {
+    // Allocate memory (8 bytes for pointer)
+    let ptr_data: any = malloc(8)
+    
+    // Store value
+    tinh_ptr_store(ptr_data, value)
+    
+    return Ptr<T>{ptr_data, true}
+}
+
+// Dereference pointer (get value)
+export func Ptr_deref<T>(ptr: Ptr<T>): T {
+    if (!ptr.is_valid) {
+        print("Error: dereferencing invalid pointer")
+        return tinh_i32_to_ptr(0)
+    }
+    return tinh_ptr_load(ptr.data)
+}
+
+// Set value
+export func Ptr_set<T>(ptr: Ptr<T>, value: T) {
+    if (ptr.is_valid) {
+        tinh_ptr_store(ptr.data, value)
+    }
+}
+
+// Move ownership (invalidate source)
+export func Ptr_move<T>(ptr: Ptr<T>): Ptr<T> {
+    let new_ptr: Ptr<T> = Ptr<T>{ptr.data, true}
+    ptr.is_valid = false
+    return new_ptr
+}
+
+// Clone (deep copy)
+export func Ptr_clone<T>(ptr: Ptr<T>): Ptr<T> {
+    let value: T = Ptr_deref<T>(ptr)
+    return Ptr_new<T>(value)
+}
+
+// Drop (free memory)
+export func Ptr_drop<T>(ptr: Ptr<T>) {
+    if (ptr.is_valid) {
+        free(ptr.data)
+        ptr.is_valid = false
+    }
+}
+
+// Check if pointer is valid
+export func Ptr_is_valid<T>(ptr: Ptr<T>): bool {
+    return ptr.is_valid
+}

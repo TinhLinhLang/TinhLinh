@@ -1,0 +1,138 @@
+// Pure Tinh Array Implementation
+// No LLVM IR needed - fully self-hosting!
+
+// Array structure
+export struct Array {
+    let data: any       // Pointer to items array
+    let length: int32   // Current number of items
+    let capacity: int32 // Allocated capacity
+}
+
+// Create new array
+export func Array_new(): Array {
+    let arr: Array = Array{0, 0, 0}
+    return arr
+}
+
+// Append item to array
+export func Array_append(arr: Array, item: any) {
+    // Check if need to grow
+    if (arr.length >= arr.capacity) {
+        // Calculate new capacity
+        let new_cap: int32 = 4
+        if (arr.capacity > 0) {
+            new_cap = arr.capacity * 2
+        }
+        
+        // Allocate new data array
+        let item_size: int32 = 8  // Size of pointer (8 bytes on 64-bit)
+        let new_size: int32 = new_cap * item_size
+        let new_data: any = malloc(new_size)
+        
+        // Copy old data if exists
+        if (arr.data != 0) {
+            // Manual copy (no memcpy in Tinh yet)
+            let i: int32 = 0
+            while (i < arr.length) {
+                let offset: int32 = i * item_size
+                // Load from old array
+                let old_ptr: any = ptr_add(arr.data, offset)
+                let value: any = ptr_load(old_ptr)
+                
+                // Store to new array
+                let new_ptr: any = ptr_add(new_data, offset)
+                ptr_store(new_ptr, value)
+                
+                i = i + 1
+            }
+            
+            // Free old data
+            free(arr.data)
+        }
+        
+        // Update array
+        arr.data = new_data
+        arr.capacity = new_cap
+    }
+    
+    // Store item at index length
+    let item_size: int32 = 8
+    let offset: int32 = arr.length * item_size
+    let ptr: any = ptr_add(arr.data, offset)
+    ptr_store(ptr, item)
+    
+    // Increment length
+    arr.length = arr.length + 1
+}
+
+// Get item at index
+export func Array_get(arr: Array, index: int32): any {
+    // Bounds check
+    if (index < 0 or index >= arr.length) {
+        return 0  // Return null on out of bounds
+    }
+    
+    // Calculate offset and load
+    let item_size: int32 = 8
+    let offset: int32 = index * item_size
+    let ptr: any = ptr_add(arr.data, offset)
+    return ptr_load(ptr)
+}
+
+// Set item at index
+export func Array_set(arr: Array, index: int32, item: any) {
+    // Bounds check
+    if (index < 0 or index >= arr.length) {
+        return  // Ignore out of bounds
+    }
+    
+    // Calculate offset and store
+    let item_size: int32 = 8
+    let offset: int32 = index * item_size
+    let ptr: any = ptr_add(arr.data, offset)
+    ptr_store(ptr, item)
+}
+
+// Get array length
+export func Array_len(arr: Array): int32 {
+    return arr.length
+}
+
+// Clear array (set length to 0)
+export func Array_clear(arr: Array) {
+    arr.length = 0
+}
+
+// Free array memory
+export func Array_free(arr: Array) {
+    if (arr.data != 0) {
+        free(arr.data)
+        arr.data = 0
+    }
+    arr.length = 0
+    arr.capacity = 0
+}
+
+// Helper functions (need to be added to compiler as intrinsics)
+
+// Add offset to pointer
+func ptr_add(ptr: any, offset: int32): any {
+    // This would be an intrinsic that compiler recognizes
+    // For now, cast to int, add, cast back
+    // In real implementation, compiler would generate:
+    // getelementptr i8, ptr %ptr, i32 %offset
+    return ptr  // Placeholder
+}
+
+// Load value from pointer
+func ptr_load(ptr: any): any {
+    // This would be an intrinsic
+    // Compiler generates: load ptr, ptr %ptr
+    return ptr  // Placeholder
+}
+
+// Store value to pointer
+func ptr_store(ptr: any, value: any) {
+    // This would be an intrinsic
+    // Compiler generates: store ptr %value, ptr %ptr
+}

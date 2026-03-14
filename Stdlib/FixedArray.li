@@ -1,0 +1,221 @@
+// FixedArray<T, N> - Fixed-Size Array
+// Array with compile-time known size N
+// Like [T; N] in Rust or std::array<T, N> in C++
+//
+// Usage:
+//   let arr: FixedArray<int32, 5> = FixedArray_new<int32, 5>()
+//   FixedArray_set<int32, 5>(arr, 0, 42)
+//   let val: int32 = FixedArray_get<int32, 5>(arr, 0)
+
+// Fixed-size array structure
+// N is a const generic - compile-time constant
+export struct FixedArray<T, N> {
+    let data: any  // Pointer to N elements
+}
+
+// Create new fixed array (all elements initialized to zero/null)
+export func FixedArray_new<T, N>(): FixedArray<T, N> {
+    // Allocate N * 8 bytes (assuming 8 bytes per element)
+    let size_bytes: int32 = N * 8
+    let data: any = malloc(size_bytes)
+    
+    // Initialize all elements to zero
+    let i: int32 = 0
+    while (i < N) {
+        let offset: int32 = i * 8
+        let elem_ptr: any = tinh_ptr_add(data, offset)
+        tinh_ptr_store(elem_ptr, tinh_i32_to_ptr(0))
+        i = i + 1
+    }
+    
+    return FixedArray<T, N>{data}
+}
+
+// Get length (always returns N)
+export func FixedArray_len<T, N>(arr: FixedArray<T, N>): int32 {
+    return N
+}
+
+// Get element at index (with bounds checking)
+export func FixedArray_get<T, N>(arr: FixedArray<T, N>, index: int32): T {
+    if (index < 0 or index >= N) {
+        print("Error: FixedArray index out of bounds")
+        return tinh_i32_to_ptr(0)
+    }
+    
+    let offset: int32 = index * 8
+    let elem_ptr: any = tinh_ptr_add(arr.data, offset)
+    return tinh_ptr_load(elem_ptr)
+}
+
+// Set element at index (with bounds checking)
+export func FixedArray_set<T, N>(arr: FixedArray<T, N>, index: int32, value: T) {
+    if (index < 0 or index >= N) {
+        print("Error: FixedArray index out of bounds")
+        return
+    }
+    
+    let offset: int32 = index * 8
+    let elem_ptr: any = tinh_ptr_add(arr.data, offset)
+    tinh_ptr_store(elem_ptr, value)
+}
+
+// Fill all elements with value
+export func FixedArray_fill<T, N>(arr: FixedArray<T, N>, value: T) {
+    let i: int32 = 0
+    while (i < N) {
+        let offset: int32 = i * 8
+        let elem_ptr: any = tinh_ptr_add(arr.data, offset)
+        tinh_ptr_store(elem_ptr, value)
+        i = i + 1
+    }
+}
+
+// Clone array (deep copy)
+export func FixedArray_clone<T, N>(arr: FixedArray<T, N>): FixedArray<T, N> {
+    let new_arr: FixedArray<T, N> = FixedArray_new<T, N>()
+    
+    // Copy all elements
+    let i: int32 = 0
+    while (i < N) {
+        let value: T = FixedArray_get<T, N>(arr, i)
+        FixedArray_set<T, N>(new_arr, i, value)
+        i = i + 1
+    }
+    
+    return new_arr
+}
+
+// Drop array (free memory)
+export func FixedArray_drop<T, N>(arr: FixedArray<T, N>) {
+    if (arr.data != tinh_i32_to_ptr(0)) {
+        free(arr.data)
+        arr.data = tinh_i32_to_ptr(0)
+    }
+}
+
+// Reverse array in place
+export func FixedArray_reverse<T, N>(arr: FixedArray<T, N>) {
+    let left: int32 = 0
+    let right: int32 = N - 1
+    
+    while (left < right) {
+        // Swap elements
+        let left_val: T = FixedArray_get<T, N>(arr, left)
+        let right_val: T = FixedArray_get<T, N>(arr, right)
+        
+        FixedArray_set<T, N>(arr, left, right_val)
+        FixedArray_set<T, N>(arr, right, left_val)
+        
+        left = left + 1
+        right = right - 1
+    }
+}
+
+// Check if array contains value (linear search)
+export func FixedArray_contains<T, N>(arr: FixedArray<T, N>, value: T): bool {
+    let i: int32 = 0
+    while (i < N) {
+        let elem: T = FixedArray_get<T, N>(arr, i)
+        if (elem == value) {
+            return true
+        }
+        i = i + 1
+    }
+    return false
+}
+
+// Find index of value (returns -1 if not found)
+export func FixedArray_index_of<T, N>(arr: FixedArray<T, N>, value: T): int32 {
+    let i: int32 = 0
+    while (i < N) {
+        let elem: T = FixedArray_get<T, N>(arr, i)
+        if (elem == value) {
+            return i
+        }
+        i = i + 1
+    }
+    return -1
+}
+
+// Convert to dynamic Array<T>
+export func FixedArray_to_array<T, N>(arr: FixedArray<T, N>): Array<T> {
+    let dyn_arr: Array<T> = Array_with_capacity<T>(N)
+    
+    let i: int32 = 0
+    while (i < N) {
+        let value: T = FixedArray_get<T, N>(arr, i)
+        Array_push<T>(dyn_arr, value)
+        i = i + 1
+    }
+    
+    return dyn_arr
+}
+
+// Create from dynamic Array<T> (takes first N elements)
+export func FixedArray_from_array<T, N>(src: Array<T>): FixedArray<T, N> {
+    let fixed_arr: FixedArray<T, N> = FixedArray_new<T, N>()
+    
+    let count: int32 = len<T>(src)
+    if (count > N) {
+        count = N
+    }
+    
+    let i: int32 = 0
+    while (i < count) {
+        let value: T = Array_get<T>(src, i)
+        FixedArray_set<T, N>(fixed_arr, i, value)
+        i = i + 1
+    }
+    
+    return fixed_arr
+}
+
+// Sum all elements (for numeric types)
+export func FixedArray_sum_i32<N>(arr: FixedArray<int32, N>): int32 {
+    let total: int32 = 0
+    let i: int32 = 0
+    while (i < N) {
+        let value: int32 = FixedArray_get<int32, N>(arr, i)
+        total = total + value
+        i = i + 1
+    }
+    return total
+}
+
+// Find minimum element (for numeric types)
+export func FixedArray_min_i32<N>(arr: FixedArray<int32, N>): int32 {
+    if (N == 0) {
+        return 0
+    }
+    
+    let min_val: int32 = FixedArray_get<int32, N>(arr, 0)
+    let i: int32 = 1
+    while (i < N) {
+        let value: int32 = FixedArray_get<int32, N>(arr, i)
+        if (value < min_val) {
+            min_val = value
+        }
+        i = i + 1
+    }
+    return min_val
+}
+
+// Find maximum element (for numeric types)
+export func FixedArray_max_i32<N>(arr: FixedArray<int32, N>): int32 {
+    if (N == 0) {
+        return 0
+    }
+    
+    let max_val: int32 = FixedArray_get<int32, N>(arr, 0)
+    let i: int32 = 1
+    while (i < N) {
+        let value: int32 = FixedArray_get<int32, N>(arr, i)
+        if (value > max_val) {
+            max_val = value
+        }
+        i = i + 1
+    }
+    return max_val
+}
+
