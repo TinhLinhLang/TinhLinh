@@ -69,17 +69,15 @@ func Type_equals(a: Type, b: Type): bool {
 }
 
 func Type_to_string(t: Type): str {
-    switch (t.kind) {
-        case TYPE_INT32(): { return "int32" }
-        case TYPE_STR(): { return "str" }
-        case TYPE_BOOL(): { return "bool" }
-        case TYPE_FLOAT(): { return "float" }
-        case TYPE_ANY(): { return "any" }
-        case TYPE_VOID(): { return "void" }
-        case TYPE_PTR(): { return "ptr" }
-        case TYPE_STRUCT(): { return t.name }
-        default: { return "unknown" }
-    }
+    if (t.kind == TYPE_INT32()) { return "int32" }
+    else if (t.kind == TYPE_STR()) { return "str" }
+    else if (t.kind == TYPE_BOOL()) { return "bool" }
+    else if (t.kind == TYPE_FLOAT()) { return "float" }
+    else if (t.kind == TYPE_ANY()) { return "any" }
+    else if (t.kind == TYPE_VOID()) { return "void" }
+    else if (t.kind == TYPE_PTR()) { return "ptr" }
+    else if (t.kind == TYPE_STRUCT()) { return t.name }
+    else { return "unknown" }
 }
 
 // Symbol table entry
@@ -169,63 +167,61 @@ func TypeChecker_infer_expr(tc: TypeChecker, node: any): Type {
     
     let kind: int32 = node.n_kind
     
-    switch (kind) {
-        case EXPR_LITERAL(): {
-            if (str_eq(node.value, "true") or str_eq(node.value, "false")) {
-                return Type_new(TYPE_BOOL(), "bool")
-            }
-            if (is_numeric(node.value)) {
-                return Type_new(TYPE_INT32(), "int32")
-            }
-            return Type_new(TYPE_STR(), "str")
+    if (kind == EXPR_LITERAL()) {
+        if (str_eq(node.value, "true") or str_eq(node.value, "false")) {
+            return Type_new(TYPE_BOOL(), "bool")
         }
-        case EXPR_VARIABLE(): {
-            let sym: Symbol = SymbolTable_lookup(tc.current_scope, node.name)
-            if (sym.type.kind != TYPE_UNKNOWN()) {
-                return sym.type
-            }
-            TypeChecker_error(tc, "Undefined variable: " + node.name)
-            return Type{TYPE_UNKNOWN(), "", false, 0, 0, 0}
-        }
-        case EXPR_BINARY(): {
-            let left_type: Type = TypeChecker_infer_expr(tc, node.left)
-            let right_type: Type = TypeChecker_infer_expr(tc, node.right)
-            return infer_binary_type(left_type, right_type, node.value)
-        }
-        case EXPR_UNARY(): {
-            let operand_type: Type = TypeChecker_infer_expr(tc, node.right)
-            return infer_unary_type(operand_type, node.value)
-        }
-        case EXPR_CALL(): {
-            let sym: Symbol = SymbolTable_lookup(tc.current_scope, node.name)
-            if (sym.is_function and sym.type.return_type != 0) {
-                return sym.type.return_type
-            }
-            // Built-in functions
-            if (str_eq(node.name, "len") or str_eq(node.name, "charAt")) {
-                return Type_new(TYPE_INT32(), "int32")
-            }
-            if (str_eq(node.name, "substr") or str_eq(node.name, "readFile") or str_eq(node.name, "i32_to_str")) {
-                return Type_new(TYPE_STR(), "str")
-            }
-            if (str_eq(node.name, "str_eq")) {
-                return Type_new(TYPE_BOOL(), "bool")
-            }
-            if (str_eq(node.name, "ptr_array_new") or str_eq(node.name, "ptr_array_get")) {
-                return Type_new(TYPE_ANY(), "any")
-            }
-            return Type_new(TYPE_VOID(), "void")
-        }
-        case EXPR_FIELD(): {
-            // For now, assume int32
+        if (is_numeric(node.value)) {
             return Type_new(TYPE_INT32(), "int32")
         }
-        case EXPR_STRUCT_INIT(): {
-            return Type_new(TYPE_STRUCT(), node.name)
+        return Type_new(TYPE_STR(), "str")
+    }
+    else if (kind == EXPR_VARIABLE()) {
+        let sym: Symbol = SymbolTable_lookup(tc.current_scope, node.name)
+        if (sym.type.kind != TYPE_UNKNOWN()) {
+            return sym.type
         }
-        default: {
-            return Type{TYPE_UNKNOWN(), "", false, 0, 0, 0}
+        TypeChecker_error(tc, "Undefined variable: " + node.name)
+        return Type{TYPE_UNKNOWN(), "", false, 0, 0, 0}
+    }
+    else if (kind == EXPR_BINARY()) {
+        let left_type: Type = TypeChecker_infer_expr(tc, node.left)
+        let right_type: Type = TypeChecker_infer_expr(tc, node.right)
+        return infer_binary_type(left_type, right_type, node.value)
+    }
+    else if (kind == EXPR_UNARY()) {
+        let operand_type: Type = TypeChecker_infer_expr(tc, node.right)
+        return infer_unary_type(operand_type, node.value)
+    }
+    else if (kind == EXPR_CALL()) {
+        let sym: Symbol = SymbolTable_lookup(tc.current_scope, node.name)
+        if (sym.is_function and sym.type.return_type != 0) {
+            return sym.type.return_type
         }
+        // Built-in functions
+        if (str_eq(node.name, "len") or str_eq(node.name, "charAt")) {
+            return Type_new(TYPE_INT32(), "int32")
+        }
+        if (str_eq(node.name, "substr") or str_eq(node.name, "readFile") or str_eq(node.name, "i32_to_str")) {
+            return Type_new(TYPE_STR(), "str")
+        }
+        if (str_eq(node.name, "str_eq")) {
+            return Type_new(TYPE_BOOL(), "bool")
+        }
+        if (str_eq(node.name, "ptr_array_new") or str_eq(node.name, "ptr_array_get")) {
+            return Type_new(TYPE_ANY(), "any")
+        }
+        return Type_new(TYPE_VOID(), "void")
+    }
+    else if (kind == EXPR_FIELD()) {
+        // For now, assume int32
+        return Type_new(TYPE_INT32(), "int32")
+    }
+    else if (kind == EXPR_STRUCT_INIT()) {
+        return Type_new(TYPE_STRUCT(), node.name)
+    }
+    else {
+        return Type{TYPE_UNKNOWN(), "", false, 0, 0, 0}
     }
 }
 

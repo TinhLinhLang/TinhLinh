@@ -8,6 +8,64 @@ func normalize_type_name(ty_name: str): str {
     return ty_name  // Return as-is for other types
 }
 
+func is_constant_function(name: str): bool {
+    // Check if this is a constant function that returns a known value
+    if (str_eq(name, "EXPR_LITERAL")) { return true }
+    if (str_eq(name, "EXPR_VARIABLE")) { return true }
+    if (str_eq(name, "EXPR_BINARY")) { return true }
+    if (str_eq(name, "EXPR_CALL")) { return true }
+    if (str_eq(name, "EXPR_FIELD")) { return true }
+    if (str_eq(name, "EXPR_UNARY")) { return true }
+    if (str_eq(name, "EXPR_ASSIGN")) { return true }
+    if (str_eq(name, "EXPR_SET_FIELD")) { return true }
+    if (str_eq(name, "EXPR_STRUCT_INIT")) { return true }
+    if (str_eq(name, "STMT_VAR_DECL")) { return true }
+    if (str_eq(name, "STMT_EXPR")) { return true }
+    if (str_eq(name, "STMT_BLOCK")) { return true }
+    if (str_eq(name, "STMT_IF")) { return true }
+    if (str_eq(name, "STMT_WHILE")) { return true }
+    if (str_eq(name, "STMT_FUNC")) { return true }
+    if (str_eq(name, "STMT_STRUCT")) { return true }
+    if (str_eq(name, "STMT_ENUM")) { return true }
+    if (str_eq(name, "STMT_IMPORT")) { return true }
+    if (str_eq(name, "STMT_RETURN")) { return true }
+    if (str_eq(name, "STMT_SWITCH")) { return true }
+    if (str_eq(name, "STMT_CASE")) { return true }
+    if (str_eq(name, "STMT_DEFAULT")) { return true }
+    if (str_eq(name, "STMT_BREAK")) { return true }
+    if (str_eq(name, "STMT_MAIN")) { return true }
+    return false
+}
+
+func get_constant_value(name: str): str {
+    // Return the constant value for known constant functions
+    if (str_eq(name, "EXPR_LITERAL")) { return "1" }
+    if (str_eq(name, "EXPR_VARIABLE")) { return "2" }
+    if (str_eq(name, "EXPR_BINARY")) { return "3" }
+    if (str_eq(name, "EXPR_CALL")) { return "4" }
+    if (str_eq(name, "EXPR_FIELD")) { return "5" }
+    if (str_eq(name, "EXPR_UNARY")) { return "6" }
+    if (str_eq(name, "EXPR_ASSIGN")) { return "7" }
+    if (str_eq(name, "EXPR_SET_FIELD")) { return "8" }
+    if (str_eq(name, "EXPR_STRUCT_INIT")) { return "9" }
+    if (str_eq(name, "STMT_VAR_DECL")) { return "10" }
+    if (str_eq(name, "STMT_EXPR")) { return "11" }
+    if (str_eq(name, "STMT_BLOCK")) { return "12" }
+    if (str_eq(name, "STMT_IF")) { return "13" }
+    if (str_eq(name, "STMT_WHILE")) { return "14" }
+    if (str_eq(name, "STMT_FUNC")) { return "15" }
+    if (str_eq(name, "STMT_STRUCT")) { return "16" }
+    if (str_eq(name, "STMT_ENUM")) { return "17" }
+    if (str_eq(name, "STMT_IMPORT")) { return "18" }
+    if (str_eq(name, "STMT_RETURN")) { return "19" }
+    if (str_eq(name, "STMT_SWITCH")) { return "20" }
+    if (str_eq(name, "STMT_CASE")) { return "21" }
+    if (str_eq(name, "STMT_DEFAULT")) { return "22" }
+    if (str_eq(name, "STMT_BREAK")) { return "23" }
+    if (str_eq(name, "STMT_MAIN")) { return "24" }
+    return "0"
+}
+
 export struct CodeGen {
     let output: str
     let globals: str
@@ -17,10 +75,11 @@ export struct CodeGen {
     let indent: str
     let current_func_return_type: str
     let last_temp_is_ptr: int32  // 0 = i32, 1 = ptr
+    let last_temp_is_i1: int32   // 0 = not i1, 1 = i1 (boolean result)
 }
 
 func CodeGen_new(): CodeGen {
-    return CodeGen{"", "", 0, 0, 0, "  ", "i32", 0}
+    return CodeGen{"", "", 0, 0, 0, "  ", "i32", 0, 0}
 }
 
 func CodeGen_next_temp(cg: CodeGen): str {
@@ -48,16 +107,29 @@ func CodeGen_emit_global(cg: CodeGen, text: str) {
 func CodeGen_set_last_type_ptr(cg: CodeGen) {
     // Set the type of the last generated temp to ptr
     cg.last_temp_is_ptr = 1
+    cg.last_temp_is_i1 = 0
 }
 
 func CodeGen_set_last_type_i32(cg: CodeGen) {
     // Set the type of the last generated temp to i32
     cg.last_temp_is_ptr = 0
+    cg.last_temp_is_i1 = 0
+}
+
+func CodeGen_set_last_type_i1(cg: CodeGen) {
+    // Set the type of the last generated temp to i1 (boolean)
+    cg.last_temp_is_ptr = 0
+    cg.last_temp_is_i1 = 1
 }
 
 func CodeGen_is_last_ptr(cg: CodeGen): bool {
     // Check if the last generated temp is ptr type
     return cg.last_temp_is_ptr == 1
+}
+
+func CodeGen_is_last_i1(cg: CodeGen): bool {
+    // Check if the last generated temp is i1 type
+    return cg.last_temp_is_i1 == 1
 }
 
 func is_numeric(s: str): bool {
@@ -162,6 +234,12 @@ func get_function_signature(name: str): FunctionSignature {
     if (str_eq(name, "compile_file")) { return FunctionSignature{"i32", "pp", false, "compile_file"} }
     if (str_eq(name, "Lexer_new")) { return FunctionSignature{"ptr", "p", false, "Lexer_new"} }
     if (str_eq(name, "Lexer_at_end")) { return FunctionSignature{"i32", "p", false, "Lexer_at_end"} }
+    if (str_eq(name, "Lexer_peek")) { return FunctionSignature{"i32", "p", false, "Lexer_peek"} }
+    if (str_eq(name, "Lexer_peek_next")) { return FunctionSignature{"i32", "p", false, "Lexer_peek_next"} }
+    if (str_eq(name, "Lexer_advance")) { return FunctionSignature{"i32", "p", false, "Lexer_advance"} }
+    if (str_eq(name, "Lexer_skip_whitespace")) { return FunctionSignature{"void", "p", false, "Lexer_skip_whitespace"} }
+    if (str_eq(name, "Lexer_scan_token")) { return FunctionSignature{"ptr", "p", false, "Lexer_scan_token"} }
+    if (str_eq(name, "Lexer_scan_tokens")) { return FunctionSignature{"ptr", "p", false, "Lexer_scan_tokens"} }
     if (str_eq(name, "Parser_new")) { return FunctionSignature{"ptr", "p", false, "Parser_new"} }
     if (str_eq(name, "CodeGen_run")) { return FunctionSignature{"ptr", "pp", false, "CodeGen_run"} }
     if (str_eq(name, "Lexer_scan_tokens")) { return FunctionSignature{"ptr", "p", false, "Lexer_scan_tokens"} }
@@ -227,55 +305,54 @@ func CodeGen_generate_expr(cg: CodeGen, node: ASTNode): str {
     
     let kind: int32 = node.n_kind
     
-    switch (kind) {
-        case EXPR_LITERAL(): {
-            if (str_eq(node.value, "true")) { return "1" }
-            if (str_eq(node.value, "false")) { return "0" }
-            if (!is_numeric(node.value)) {
-                cg.string_count = cg.string_count + 1
-                let g_name: str = "@.str." + i32_to_str(cg.string_count)
-                let raw: str = node.value
-                let size: int32 = len(raw) + 1
-                
-                // Build LLVM IR string using hex format for special characters
-                let llvm_str: str = "c\""
-                let i: int32 = 0
-                while (i < len(raw)) {
-                    let c: int32 = charAt(raw, i)
-                    if (c == 10) {  // newline
-                        llvm_str = llvm_str + "\\0A"
-                    } else if (c == 9) {  // tab
-                        llvm_str = llvm_str + "\\09"
-                    } else if (c == 13) {  // carriage return
-                        llvm_str = llvm_str + "\\0D"
-                    } else if (c == 92) {  // backslash
-                        llvm_str = llvm_str + "\\5C"
-                    } else if (c == 34) {  // quote
-                        llvm_str = llvm_str + "\\22"
-                    } else if (c == 0) {  // null
-                        llvm_str = llvm_str + "\\00"
-                    } else if (c < 32 or c > 126) {  // non-printable
-                        // Use hex format for non-printable characters
-                        llvm_str = llvm_str + "\\00"  // placeholder, should convert to hex
-                    } else {
-                        llvm_str = llvm_str + substr(raw, i, 1)
-                    }
-                    i = i + 1
+    if (kind == EXPR_LITERAL()) {
+        if (str_eq(node.value, "true")) { return "1" }
+        if (str_eq(node.value, "false")) { return "0" }
+        if (!is_numeric(node.value)) {
+            cg.string_count = cg.string_count + 1
+            let g_name: str = "@.str." + i32_to_str(cg.string_count)
+            let raw: str = node.value
+            let size: int32 = len(raw) + 1
+            
+            // Build LLVM IR string using hex format for special characters
+            let llvm_str: str = "c\""
+            let i: int32 = 0
+            while (i < len(raw)) {
+                let c: int32 = charAt(raw, i)
+                if (c == 10) {  // newline
+                    llvm_str = llvm_str + "\\0A"
+                } else if (c == 9) {  // tab
+                    llvm_str = llvm_str + "\\09"
+                } else if (c == 13) {  // carriage return
+                    llvm_str = llvm_str + "\\0D"
+                } else if (c == 92) {  // backslash
+                    llvm_str = llvm_str + "\\5C"
+                } else if (c == 34) {  // quote
+                    llvm_str = llvm_str + "\\22"
+                } else if (c == 0) {  // null
+                    llvm_str = llvm_str + "\\00"
+                } else if (c < 32 or c > 126) {  // non-printable
+                    // Use hex format for non-printable characters
+                    llvm_str = llvm_str + "\\00"  // placeholder, should convert to hex
+                } else {
+                    llvm_str = llvm_str + substr(raw, i, 1)
                 }
-                llvm_str = llvm_str + "\\00\""
-                
-                CodeGen_emit_global(cg, g_name + " = private unnamed_addr constant [" + i32_to_str(size) + " x i8] " + llvm_str + ", align 1")
-                let res: str = CodeGen_next_temp(cg)
-                CodeGen_emit(cg, res + " = getelementptr inbounds [" + i32_to_str(size) + " x i8], ptr " + g_name + ", i32 0, i32 0")
-                CodeGen_set_last_type_ptr(cg)
-                return res
+                i = i + 1
             }
-            return node.value
-        }
-        case EXPR_VARIABLE(): {
+            llvm_str = llvm_str + "\\00\""
+            
+            CodeGen_emit_global(cg, g_name + " = private unnamed_addr constant [" + i32_to_str(size) + " x i8] " + llvm_str + ", align 1")
             let res: str = CodeGen_next_temp(cg)
+            CodeGen_emit(cg, res + " = getelementptr inbounds [" + i32_to_str(size) + " x i8], ptr " + g_name + ", i32 0, i32 0")
+            CodeGen_set_last_type_ptr(cg)
+            return res
+        }
+        return node.value
+    }
+    else if (kind == EXPR_VARIABLE()) {
+        let res: str = CodeGen_next_temp(cg)
         let load_type: str = "i32"
-        if (str_eq(node.name, "input") or str_eq(node.name, "output") or str_eq(node.name, "input_file") or str_eq(node.name, "output_file") or str_eq(node.name, "input_path") or str_eq(node.name, "output_path") or str_eq(node.name, "name") or str_eq(node.name, "value") or str_eq(node.name, "lexeme") or str_eq(node.name, "ty_name") or str_eq(node.name, "source") or str_eq(node.name, "text") or str_eq(node.name, "content") or str_eq(node.name, "lexer") or str_eq(node.name, "tokens") or str_eq(node.name, "parser") or str_eq(node.name, "cg") or str_eq(node.name, "stmts") or str_eq(node.name, "args") or str_eq(node.name, "params") or str_eq(node.name, "ir") or str_eq(node.name, "base_dir") or str_eq(node.name, "mm") or str_eq(node.name, "resolved_path") or str_eq(node.name, "import_path") or str_eq(node.name, "escaped") or str_eq(node.name, "llvm_str") or str_eq(node.name, "raw") or str_eq(node.name, "g_name") or str_eq(node.name, "res") or str_eq(node.name, "lhs") or str_eq(node.name, "rhs") or str_eq(node.name, "actual_name") or str_eq(node.name, "ret_ty") or str_eq(node.name, "param_types") or str_eq(node.name, "args_str") or str_eq(node.name, "load_type") or str_eq(node.name, "l1") or str_eq(node.name, "l2") or str_eq(node.name, "l3") or str_eq(node.name, "ds") or str_eq(node.name, "functions") or str_eq(node.name, "result") or str_eq(node.name, "mod") or str_eq(node.name, "main_module") or str_eq(node.name, "current_stmts") or str_eq(node.name, "new_to_process") or str_eq(node.name, "to_process") or str_eq(node.name, "imports") or str_eq(node.name, "all_stmts") or str_eq(node.name, "mod_lexer") or str_eq(node.name, "mod_tokens") or str_eq(node.name, "mod_parser") or str_eq(node.name, "mod_stmts") or str_eq(node.name, "t") or str_eq(node.name, "l") or str_eq(node.name, "p") or str_eq(node.name, "node") or str_eq(node.name, "tok") or str_eq(node.name, "param") or str_eq(node.name, "expr") or str_eq(node.name, "stmt")) {
+        if (str_eq(node.name, "input") or str_eq(node.name, "output") or str_eq(node.name, "input_file") or str_eq(node.name, "output_file") or str_eq(node.name, "input_path") or str_eq(node.name, "output_path") or str_eq(node.name, "name") or str_eq(node.name, "value") or str_eq(node.name, "lexeme") or str_eq(node.name, "ty_name") or str_eq(node.name, "source") or str_eq(node.name, "text") or str_eq(node.name, "content") or str_eq(node.name, "lexer") or str_eq(node.name, "tokens") or str_eq(node.name, "parser") or str_eq(node.name, "cg") or str_eq(node.name, "stmts") or str_eq(node.name, "args") or str_eq(node.name, "params") or str_eq(node.name, "ir") or str_eq(node.name, "base_dir") or str_eq(node.name, "mm") or str_eq(node.name, "resolved_path") or str_eq(node.name, "import_path") or str_eq(node.name, "escaped") or str_eq(node.name, "llvm_str") or str_eq(node.name, "raw") or str_eq(node.name, "g_name") or str_eq(node.name, "res") or str_eq(node.name, "lhs") or str_eq(node.name, "rhs") or str_eq(node.name, "actual_name") or str_eq(node.name, "ret_ty") or str_eq(node.name, "param_types") or str_eq(node.name, "args_str") or str_eq(node.name, "load_type") or str_eq(node.name, "l1") or str_eq(node.name, "l2") or str_eq(node.name, "l3") or str_eq(node.name, "ds") or str_eq(node.name, "functions") or str_eq(node.name, "mod") or str_eq(node.name, "main_module") or str_eq(node.name, "current_stmts") or str_eq(node.name, "new_to_process") or str_eq(node.name, "to_process") or str_eq(node.name, "imports") or str_eq(node.name, "all_stmts") or str_eq(node.name, "mod_lexer") or str_eq(node.name, "mod_tokens") or str_eq(node.name, "mod_parser") or str_eq(node.name, "mod_stmts") or str_eq(node.name, "l") or str_eq(node.name, "t") or str_eq(node.name, "p") or str_eq(node.name, "node") or str_eq(node.name, "tok") or str_eq(node.name, "param") or str_eq(node.name, "expr") or str_eq(node.name, "stmt")) {
             load_type = "ptr"
         }
         CodeGen_emit(cg, res + " = load " + load_type + ", ptr %" + node.name)
@@ -286,19 +363,20 @@ func CodeGen_generate_expr(cg: CodeGen, node: ASTNode): str {
         }
         return res
     }
-    }
     
-    if (kind == EXPR_BINARY()) {
+    else if (kind == EXPR_BINARY()) {
         // Handle logical operators with short-circuit evaluation
         if (str_eq(node.value, "and")) {
             let l1: str = CodeGen_next_label(cg)
             let l2: str = CodeGen_next_label(cg)
             let l3: str = CodeGen_next_label(cg)
             let lhs: str = CodeGen_generate_expr(cg, node.left)
-            // Convert i32 to i1 for branch
+            
+            // All expressions return i32, so always convert to i1 for branch
             let lhs_bool: str = CodeGen_next_temp(cg)
             CodeGen_emit(cg, lhs_bool + " = icmp ne i32 " + lhs + ", 0")
             CodeGen_emit(cg, "br i1 " + lhs_bool + ", label %" + l1 + ", label %" + l2)
+            
             CodeGen_emit_raw(cg, l1 + ":")
             let rhs: str = CodeGen_generate_expr(cg, node.right)
             CodeGen_emit(cg, "br label %" + l3)
@@ -306,7 +384,10 @@ func CodeGen_generate_expr(cg: CodeGen, node: ASTNode): str {
             CodeGen_emit(cg, "br label %" + l3)
             CodeGen_emit_raw(cg, l3 + ":")
             let res: str = CodeGen_next_temp(cg)
+            
+            // Always return i32
             CodeGen_emit(cg, res + " = phi i32 [ " + rhs + ", %" + l1 + " ], [ 0, %" + l2 + " ]")
+            CodeGen_set_last_type_i32(cg)
             return res
         }
         else if (str_eq(node.value, "or")) {
@@ -314,10 +395,12 @@ func CodeGen_generate_expr(cg: CodeGen, node: ASTNode): str {
             let l2: str = CodeGen_next_label(cg)
             let l3: str = CodeGen_next_label(cg)
             let lhs: str = CodeGen_generate_expr(cg, node.left)
-            // Convert i32 to i1 for branch
+            
+            // All expressions return i32, so always convert to i1 for branch
             let lhs_bool: str = CodeGen_next_temp(cg)
             CodeGen_emit(cg, lhs_bool + " = icmp ne i32 " + lhs + ", 0")
             CodeGen_emit(cg, "br i1 " + lhs_bool + ", label %" + l1 + ", label %" + l2)
+            
             CodeGen_emit_raw(cg, l1 + ":")
             CodeGen_emit(cg, "br label %" + l3)
             CodeGen_emit_raw(cg, l2 + ":")
@@ -325,7 +408,10 @@ func CodeGen_generate_expr(cg: CodeGen, node: ASTNode): str {
             CodeGen_emit(cg, "br label %" + l3)
             CodeGen_emit_raw(cg, l3 + ":")
             let res: str = CodeGen_next_temp(cg)
+            
+            // Always return i32
             CodeGen_emit(cg, res + " = phi i32 [ 1, %" + l1 + " ], [ " + rhs + ", %" + l2 + " ]")
+            CodeGen_set_last_type_i32(cg)
             return res
         }
         
@@ -384,16 +470,14 @@ func CodeGen_generate_expr(cg: CodeGen, node: ASTNode): str {
                     rhs_is_string = true
                 }
             }
+            let cmp_res: str = CodeGen_next_temp(cg)
             if (lhs_is_string and rhs_is_string) { 
-                let cmp_res: str = CodeGen_next_temp(cg)
                 CodeGen_emit(cg, cmp_res + " = icmp eq ptr " + lhs + ", " + rhs)
-                CodeGen_emit(cg, res + " = zext i1 " + cmp_res + " to i32")
             }
             else { 
-                let cmp_res: str = CodeGen_next_temp(cg)
                 CodeGen_emit(cg, cmp_res + " = icmp eq i32 " + lhs + ", " + rhs)
-                CodeGen_emit(cg, res + " = zext i1 " + cmp_res + " to i32")
             }
+            CodeGen_emit(cg, res + " = zext i1 " + cmp_res + " to i32")
             CodeGen_set_last_type_i32(cg)
         }
         else if (str_eq(node.value, "!=")) { 
@@ -429,7 +513,69 @@ func CodeGen_generate_expr(cg: CodeGen, node: ASTNode): str {
         return res
     }
 
-    if (kind == EXPR_CALL()) {
+    else if (kind == EXPR_CALL()) {
+        // Type casting functions: int32(), bool(), ptr()
+        if (str_eq(node.name, "int32")) {
+            let n: int32 = ptr_array_len(node.args)
+            if (n != 1) {
+                // Error: int32() expects 1 argument
+                return "0"
+            }
+            let arg_val: str = CodeGen_generate_expr(cg, ptr_array_get(node.args, 0))
+            // Check if last temp was ptr, if so use ptrtoint
+            if (cg.last_temp_is_ptr == 1) {
+                let res: str = CodeGen_next_temp(cg)
+                CodeGen_emit(cg, res + " = ptrtoint ptr " + arg_val + " to i32")
+                CodeGen_set_last_type_i32(cg)
+                return res
+            }
+            // Otherwise just return as-is (already i32)
+            CodeGen_set_last_type_i32(cg)
+            return arg_val
+        }
+        
+        if (str_eq(node.name, "bool")) {
+            let n: int32 = ptr_array_len(node.args)
+            if (n != 1) {
+                return "0"
+            }
+            let arg_val: str = CodeGen_generate_expr(cg, ptr_array_get(node.args, 0))
+            let res: str = CodeGen_next_temp(cg)
+            if (cg.last_temp_is_ptr == 1) {
+                // ptr to bool: check if null, then convert to i32
+                let cmp_temp: str = CodeGen_next_temp(cg)
+                CodeGen_emit(cg, cmp_temp + " = icmp ne ptr " + arg_val + ", null")
+                CodeGen_emit(cg, res + " = zext i1 " + cmp_temp + " to i32")
+            } else if (cg.last_temp_is_i1 == 1) {
+                // i1 to i32
+                CodeGen_emit(cg, res + " = zext i1 " + arg_val + " to i32")
+            } else {
+                // i32 to bool: compare with 0, then convert back to i32
+                let cmp_temp: str = CodeGen_next_temp(cg)
+                CodeGen_emit(cg, cmp_temp + " = icmp ne i32 " + arg_val + ", 0")
+                CodeGen_emit(cg, res + " = zext i1 " + cmp_temp + " to i32")
+            }
+            CodeGen_set_last_type_i32(cg)
+            return res
+        }
+        
+        if (str_eq(node.name, "ptr")) {
+            let n: int32 = ptr_array_len(node.args)
+            if (n != 1) {
+                return "0"
+            }
+            let arg_val: str = CodeGen_generate_expr(cg, ptr_array_get(node.args, 0))
+            // Check if last temp was ptr, if so return as-is
+            if (cg.last_temp_is_ptr == 1) {
+                return arg_val
+            }
+            // i32 to ptr: use inttoptr
+            let res: str = CodeGen_next_temp(cg)
+            CodeGen_emit(cg, res + " = inttoptr i32 " + arg_val + " to ptr")
+            CodeGen_set_last_type_ptr(cg)
+            return res
+        }
+        
         // Use helper function to get function signature
         let sig: FunctionSignature = get_function_signature(node.name)
         let actual_name: str = sig.actual_name
@@ -489,7 +635,7 @@ func CodeGen_generate_expr(cg: CodeGen, node: ASTNode): str {
         }
     }
 
-    if (kind == EXPR_FIELD()) {
+    else if (kind == EXPR_FIELD()) {
         let base: str = CodeGen_generate_expr(cg, node.left)
         let offset: int32 = get_field_offset(node.name)
         let res_ptr: str = CodeGen_next_temp(cg)
@@ -511,7 +657,7 @@ func CodeGen_generate_expr(cg: CodeGen, node: ASTNode): str {
         return res
     }
 
-    if (kind == EXPR_SET_FIELD()) {
+    else if (kind == EXPR_SET_FIELD()) {
         let base: str = CodeGen_generate_expr(cg, node.left)
         let offset: int32 = get_field_offset(node.name)
         let val: str = CodeGen_generate_expr(cg, node.right)
@@ -528,9 +674,10 @@ func CodeGen_generate_expr(cg: CodeGen, node: ASTNode): str {
         return val
     }
 
-    if (kind == EXPR_STRUCT_INIT()) {
+    else if (kind == EXPR_STRUCT_INIT()) {
         let size_bytes: int32 = get_struct_size(node.name)
         let res: str = CodeGen_next_temp(cg)
+        CodeGen_emit_raw(cg, "; DEBUG: STRUCT_INIT for " + node.name)
         CodeGen_emit(cg, res + " = call ptr @tinh_malloc(i64 " + i32_to_str(size_bytes) + ")")
         
         let n: int32 = ptr_array_len(node.args)
@@ -560,6 +707,7 @@ func CodeGen_generate_expr(cg: CodeGen, node: ASTNode): str {
                 else if (i == 4) { field_type = "i32" }
             } else if (str_eq(node.name, "Lexer")) {
                 // Lexer: l_source(ptr), l_source_len(i32), l_start(i32), l_current(i32), l_line(i32), l_col(i32), l_tokens(ptr)
+                CodeGen_emit_raw(cg, "; DEBUG: Lexer field " + i32_to_str(i))
                 if (i == 0 or i == 6) { field_type = "ptr" }
                 else { field_type = "i32" }
             } else if (str_eq(node.name, "ModuleManager") or str_eq(node.name, "Parser") or str_eq(node.name, "CodeGen") or str_eq(node.name, "ASTNode") or str_eq(node.name, "TokenArray")) {
@@ -567,6 +715,7 @@ func CodeGen_generate_expr(cg: CodeGen, node: ASTNode): str {
                 field_type = "ptr"
             }
             
+            CodeGen_emit_raw(cg, "; DEBUG: Using field_type = " + field_type + " for field " + i32_to_str(i))
             CodeGen_emit(cg, f_ptr + " = getelementptr inbounds " + field_type + ", ptr " + res + ", i32 " + i32_to_str(i))
             CodeGen_emit(cg, "store " + field_type + " " + val + ", ptr " + f_ptr)
             i = i + 1
@@ -574,7 +723,7 @@ func CodeGen_generate_expr(cg: CodeGen, node: ASTNode): str {
         return res
     }
 
-    if (kind == EXPR_ASSIGN()) {
+    else if (kind == EXPR_ASSIGN()) {
         let val: str = CodeGen_generate_expr(cg, node.right)
         let store_type: str = "i32"
         
@@ -587,7 +736,7 @@ func CodeGen_generate_expr(cg: CodeGen, node: ASTNode): str {
         }
         
         // Check if variable is known to be ptr type (hardcoded list)
-        if (str_eq(node.name, "input") or str_eq(node.name, "output") or str_eq(node.name, "input_file") or str_eq(node.name, "output_file") or str_eq(node.name, "input_path") or str_eq(node.name, "output_path") or str_eq(node.name, "name") or str_eq(node.name, "value") or str_eq(node.name, "lexeme") or str_eq(node.name, "ty_name") or str_eq(node.name, "source") or str_eq(node.name, "text") or str_eq(node.name, "content") or str_eq(node.name, "lexer") or str_eq(node.name, "tokens") or str_eq(node.name, "parser") or str_eq(node.name, "cg") or str_eq(node.name, "stmts") or str_eq(node.name, "args") or str_eq(node.name, "params") or str_eq(node.name, "ir") or str_eq(node.name, "base_dir") or str_eq(node.name, "mm") or str_eq(node.name, "resolved_path") or str_eq(node.name, "import_path") or str_eq(node.name, "escaped") or str_eq(node.name, "llvm_str") or str_eq(node.name, "raw") or str_eq(node.name, "g_name") or str_eq(node.name, "res") or str_eq(node.name, "lhs") or str_eq(node.name, "rhs") or str_eq(node.name, "actual_name") or str_eq(node.name, "ret_ty") or str_eq(node.name, "param_types") or str_eq(node.name, "args_str") or str_eq(node.name, "load_type") or str_eq(node.name, "l1") or str_eq(node.name, "l2") or str_eq(node.name, "l3") or str_eq(node.name, "ds") or str_eq(node.name, "functions") or str_eq(node.name, "result") or str_eq(node.name, "mod") or str_eq(node.name, "main_module") or str_eq(node.name, "current_stmts") or str_eq(node.name, "new_to_process") or str_eq(node.name, "to_process") or str_eq(node.name, "imports") or str_eq(node.name, "all_stmts") or str_eq(node.name, "mod_lexer") or str_eq(node.name, "mod_tokens") or str_eq(node.name, "mod_parser") or str_eq(node.name, "mod_stmts")) {
+        if (str_eq(node.name, "input") or str_eq(node.name, "output") or str_eq(node.name, "input_file") or str_eq(node.name, "output_file") or str_eq(node.name, "input_path") or str_eq(node.name, "output_path") or str_eq(node.name, "name") or str_eq(node.name, "value") or str_eq(node.name, "lexeme") or str_eq(node.name, "ty_name") or str_eq(node.name, "source") or str_eq(node.name, "text") or str_eq(node.name, "content") or str_eq(node.name, "lexer") or str_eq(node.name, "tokens") or str_eq(node.name, "parser") or str_eq(node.name, "cg") or str_eq(node.name, "stmts") or str_eq(node.name, "args") or str_eq(node.name, "params") or str_eq(node.name, "ir") or str_eq(node.name, "base_dir") or str_eq(node.name, "mm") or str_eq(node.name, "resolved_path") or str_eq(node.name, "import_path") or str_eq(node.name, "escaped") or str_eq(node.name, "llvm_str") or str_eq(node.name, "raw") or str_eq(node.name, "g_name") or str_eq(node.name, "res") or str_eq(node.name, "lhs") or str_eq(node.name, "rhs") or str_eq(node.name, "actual_name") or str_eq(node.name, "ret_ty") or str_eq(node.name, "param_types") or str_eq(node.name, "args_str") or str_eq(node.name, "load_type") or str_eq(node.name, "l1") or str_eq(node.name, "l2") or str_eq(node.name, "l3") or str_eq(node.name, "ds") or str_eq(node.name, "functions") or str_eq(node.name, "mod") or str_eq(node.name, "main_module") or str_eq(node.name, "current_stmts") or str_eq(node.name, "new_to_process") or str_eq(node.name, "to_process") or str_eq(node.name, "imports") or str_eq(node.name, "all_stmts") or str_eq(node.name, "mod_lexer") or str_eq(node.name, "mod_tokens") or str_eq(node.name, "mod_parser") or str_eq(node.name, "mod_stmts") or str_eq(node.name, "l") or str_eq(node.name, "p") or str_eq(node.name, "node") or str_eq(node.name, "tok") or str_eq(node.name, "param") or str_eq(node.name, "expr") or str_eq(node.name, "stmt")) {
             store_type = "ptr"
         }
         
@@ -595,13 +744,21 @@ func CodeGen_generate_expr(cg: CodeGen, node: ASTNode): str {
         return val
     }
 
-    if (kind == EXPR_UNARY()) {
+    else if (kind == EXPR_UNARY()) {
         let right: str = CodeGen_generate_expr(cg, node.right)
         let res: str = CodeGen_next_temp(cg)
         if (str_eq(node.value, "!")) { 
             let cmp_res: str = CodeGen_next_temp(cg)
-            CodeGen_emit(cg, cmp_res + " = icmp eq i32 " + right + ", 0")
-            CodeGen_emit(cg, res + " = zext i1 " + cmp_res + " to i32")
+            if (CodeGen_is_last_i1(cg)) {
+                // Operand is i1, negate and convert to i32
+                let neg_res: str = CodeGen_next_temp(cg)
+                CodeGen_emit(cg, neg_res + " = xor i1 " + right + ", true")
+                CodeGen_emit(cg, res + " = zext i1 " + neg_res + " to i32")
+            } else {
+                // Operand is i32, compare with 0
+                CodeGen_emit(cg, cmp_res + " = icmp eq i32 " + right + ", 0")
+                CodeGen_emit(cg, res + " = zext i1 " + cmp_res + " to i32")
+            }
             CodeGen_set_last_type_i32(cg)
         }
         else if (str_eq(node.value, "-")) { 
@@ -650,12 +807,13 @@ func CodeGen_generate_stmt(cg: CodeGen, node: ASTNode) {
     else if (kind == STMT_EXPR()) { CodeGen_generate_expr(cg, node.left) }
     else if (kind == STMT_IF()) {
         let cond: str = CodeGen_generate_expr(cg, node.condition)
-        // Convert i32 to i1 for branch
-        let cond_bool: str = CodeGen_next_temp(cg)
-        CodeGen_emit(cg, cond_bool + " = icmp ne i32 " + cond + ", 0")
         let l1: str = CodeGen_next_label(cg)
         let l2: str = CodeGen_next_label(cg)
         let l3: str = CodeGen_next_label(cg)
+        
+        // All expressions now return i32, so always convert to i1 for branch
+        let cond_bool: str = CodeGen_next_temp(cg)
+        CodeGen_emit(cg, cond_bool + " = icmp ne i32 " + cond + ", 0")
         CodeGen_emit(cg, "br i1 " + cond_bool + ", label %" + l1 + ", label %" + l2)
         CodeGen_emit_raw(cg, l1 + ":")
         CodeGen_generate_stmt(cg, node.body)
@@ -672,10 +830,12 @@ func CodeGen_generate_stmt(cg: CodeGen, node: ASTNode) {
         CodeGen_emit(cg, "br label %" + l1)
         CodeGen_emit_raw(cg, l1 + ":")
         let cond: str = CodeGen_generate_expr(cg, node.condition)
-        // Convert i32 to i1 for branch
+        
+        // All expressions now return i32, so always convert to i1 for branch
         let cond_bool: str = CodeGen_next_temp(cg)
         CodeGen_emit(cg, cond_bool + " = icmp ne i32 " + cond + ", 0")
         CodeGen_emit(cg, "br i1 " + cond_bool + ", label %" + l2 + ", label %" + l3)
+        
         CodeGen_emit_raw(cg, l2 + ":")
         CodeGen_generate_stmt(cg, node.body)
         CodeGen_emit(cg, "br label %" + l1)
@@ -697,7 +857,17 @@ func CodeGen_generate_stmt(cg: CodeGen, node: ASTNode) {
             if (case_node.n_kind == STMT_CASE()) {
                 let case_label: str = CodeGen_next_label(cg)
                 ptr_array_append(case_labels, case_label)
-                let case_value: str = CodeGen_generate_expr(cg, case_node.condition)
+                
+                // Handle constant function calls in case values
+                let case_value: str = ""
+                if (case_node.condition.n_kind == EXPR_CALL() and is_constant_function(case_node.condition.name)) {
+                    // This is a constant function call, use the constant value
+                    case_value = get_constant_value(case_node.condition.name)
+                } else {
+                    // Regular expression
+                    case_value = CodeGen_generate_expr(cg, case_node.condition)
+                }
+                
                 let cmp_result: str = CodeGen_next_temp(cg)
                 CodeGen_emit(cg, cmp_result + " = icmp eq i32 " + switch_expr + ", " + case_value)
                 let next_case_label: str = CodeGen_next_label(cg)

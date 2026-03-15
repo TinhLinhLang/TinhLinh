@@ -1,0 +1,146 @@
+// Vector_any - Dynamic Array for any (pointers) - non-generic version for bootstrap
+
+export struct Vector_any {
+    let data: any       // Pointer to vector data
+    let length: int32   // Current number of elements
+    let capacity: int32 // Allocated capacity
+}
+
+// Create new empty vector
+export func Vector_new_any(): Vector_any {
+    let initial_capacity: int32 = 10
+    let size_bytes: int32 = initial_capacity * 8
+    let data: any = malloc(size_bytes)
+    return Vector_any{data, 0, initial_capacity}
+}
+
+// Get length
+export func Vector_len_any(arr: Vector_any): int32 {
+    return arr.length
+}
+
+// Get element at index
+export func Vector_get_any(arr: Vector_any, index: int32): any {
+    if (index < 0 or index >= arr.length) {
+        print("Error: Array index out of bounds")
+        return tinh_i32_to_ptr(0)
+    }
+    
+    let offset: int32 = index * 8
+    let elem_ptr: any = tinh_ptr_add(arr.data, offset)
+    return tinh_ptr_load(elem_ptr)
+}
+
+// Set element at index
+export func Vector_set_any(arr: Vector_any, index: int32, value: any) {
+    if (index < 0 or index >= arr.length) {
+        print("Error: Array index out of bounds")
+        return
+    }
+    
+    let offset: int32 = index * 8
+    let elem_ptr: any = tinh_ptr_add(arr.data, offset)
+    tinh_ptr_store(elem_ptr, value)
+}
+
+// Push element
+export func Vector_push_any(arr: Vector_any, value: any) {
+    if (arr.length >= arr.capacity) {
+        // Grow capacity
+        let new_capacity: int32 = arr.capacity * 2
+        let new_size_bytes: int32 = new_capacity * 8
+        let new_data: any = malloc(new_size_bytes)
+        
+        // Copy old data
+        let i: int32 = 0
+        while (i < arr.length) {
+            let old_offset: int32 = i * 8
+            let new_offset: int32 = i * 8
+            let old_ptr: any = tinh_ptr_add(arr.data, old_offset)
+            let new_ptr: any = tinh_ptr_add(new_data, new_offset)
+            let value_old: any = tinh_ptr_load(old_ptr)
+            tinh_ptr_store(new_ptr, value_old)
+            i = i + 1
+        }
+        
+        free(arr.data)
+        arr.data = new_data
+        arr.capacity = new_capacity
+    }
+    
+    let offset: int32 = arr.length * 8
+    let elem_ptr: any = tinh_ptr_add(arr.data, offset)
+    tinh_ptr_store(elem_ptr, value)
+    arr.length = arr.length + 1
+}
+
+// Pop element
+export func Vector_pop_any(arr: Vector_any): any {
+    if (arr.length == 0) {
+        print("Error: Cannot pop from empty array")
+        return tinh_i32_to_ptr(0)
+    }
+    
+    arr.length = arr.length - 1
+    let offset: int32 = arr.length * 8
+    let elem_ptr: any = tinh_ptr_add(arr.data, offset)
+    return tinh_ptr_load(elem_ptr)
+}
+
+// Clear all elements
+export func Vector_clear_any(arr: Vector_any) {
+    arr.length = 0
+}
+
+// Drop/free vector
+export func Vector_drop_any(arr: Vector_any) {
+    if (arr.data != tinh_i32_to_ptr(0)) {
+        free(arr.data)
+        arr.data = tinh_i32_to_ptr(0)
+        arr.length = 0
+        arr.capacity = 0
+    }
+}
+
+// Check if contains element
+export func Vector_contains_any(arr: Vector_any, value: any): bool {
+    let i: int32 = 0
+    while (i < arr.length) {
+        let elem: any = Vector_get_any(arr, i)
+        if (elem == value) {
+            return true
+        }
+        i = i + 1
+    }
+    return false
+}
+
+// Find index of element
+export func Vector_index_of_any(arr: Vector_any, value: any): int32 {
+    let i: int32 = 0
+    while (i < arr.length) {
+        let elem: any = Vector_get_any(arr, i)
+        if (elem == value) {
+            return i
+        }
+        i = i + 1
+    }
+    return -1
+}
+
+// Reverse in place
+export func Vector_reverse_any(arr: Vector_any) {
+    let left: int32 = 0
+    let right: int32 = arr.length - 1
+    
+    while (left < right) {
+        let left_val: any = Vector_get_any(arr, left)
+        let right_val: any = Vector_get_any(arr, right)
+        
+        Vector_set_any(arr, left, right_val)
+        Vector_set_any(arr, right, left_val)
+        
+        left = left + 1
+        right = right - 1
+    }
+}

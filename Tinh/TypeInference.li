@@ -114,17 +114,15 @@ func types_compatible(target: any, source: any): bool {
 
 // Get LLVM type string from Type
 func Type_to_llvm(t: any): str {
-    switch (t.kind) {
-        case TYPE_INT32(): { return "i32" }
-        case TYPE_BOOL(): { return "i1" }
-        case TYPE_FLOAT(): { return "float" }
-        case TYPE_STR(): { return "ptr" }
-        case TYPE_PTR(): { return "ptr" }
-        case TYPE_ANY(): { return "ptr" }
-        case TYPE_VOID(): { return "void" }
-        case TYPE_STRUCT(): { return "ptr" }
-        default: { return "i32" }  // Default
-    }
+    if (t.kind == TYPE_INT32()) { return "i32" }
+    else if (t.kind == TYPE_BOOL()) { return "i1" }
+    else if (t.kind == TYPE_FLOAT()) { return "float" }
+    else if (t.kind == TYPE_STR()) { return "ptr" }
+    else if (t.kind == TYPE_PTR()) { return "ptr" }
+    else if (t.kind == TYPE_ANY()) { return "ptr" }
+    else if (t.kind == TYPE_VOID()) { return "void" }
+    else if (t.kind == TYPE_STRUCT()) { return "ptr" }
+    else { return "i32" }  // Default
 }
 
 // Check if value needs casting

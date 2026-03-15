@@ -53,7 +53,7 @@ let x: int32 = 42
 let name: str = "Tinh Linh"
 
 // Constants
-const PI: float = 3.14159
+const PI: float32 = 3.14159
 
 // Functions
 func add(a: int32, b: int32): int32 {

@@ -7,6 +7,12 @@ func INVALID(): int32 { return 3 }
 func VAR(): int32 { return 10 }
 func LET(): int32 { return 11 }
 func CONST(): int32 { return 12 }
+func TOKEN_CONST(): int32 { return 12 }
+func TOKEN_CASE(): int32 { return 28 }
+func TOKEN_DEFAULT(): int32 { return 29 }
+func TOKEN_BREAK(): int32 { return 23 }
+func TOKEN_VAR(): int32 { return 10 }
+func TOKEN_LET(): int32 { return 11 }
 func FUNC(): int32 { return 13 }
 func IF(): int32 { return 14 }
 func ELSE(): int32 { return 15 }
