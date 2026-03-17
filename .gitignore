@@ -3,11 +3,13 @@
 # Compiled outputs
 *.ll
 *.obj
-*.exe
 *.o
 *.so
 *.dylib
 *.dll
+
+# Exclude bootstrap compiler
+!Compiler.exe
 
 # Build directories
 build/
