@@ -1,29 +1,181 @@
-# Build artifacts
+# TinhLinh .gitignore
+
+# Compiled outputs
 *.ll
 *.obj
 *.exe
 *.o
-*.a
 *.so
+*.dylib
 *.dll
 
-# Logs
-*.log
+# Build directories
+build/
+dist/
+out/
 
-# IDE
-.vs/
+# IDE and editor files
 .vscode/
-*.suo
-*.user
-ARCHITECTURE.md
-COMPLETION_SUMMARY.md
-BUILD.md
+.idea/
+*.swp
+*.swo
+*~
 
-# OS
+# OS generated files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
 # Temporary files
 *.tmp
+*.temp
+*.log
 *.bak
+*.backup
+
+# Test outputs
+test_*.li
+test_*.ll
+test_*.exe
+test_*.obj
+
+# Debug files
+debug_*
+*.pdb
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Node.js (for web components)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python (for build scripts)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+
+# Rust (if any Rust components)
+target/
+Cargo.lock
+
+# Go (if any Go components)
+*.exe~
+*.test
+*.prof
+
+# Java (if any Java components)
+*.class
+*.jar
+*.war
+*.ear
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Local configuration
+.env
+.env.local
+config.local.*
+
+# Documentation build
+docs/_build/
+site/
+
+# Coverage reports
+coverage/
+*.lcov
+
+# Profiling
+*.prof
+*.trace
+
+# Benchmarks
+benchmark_results/
+
+# Large files that shouldn't be in git
+*.iso
+*.img
+*.bin
+
+# Backup files from editors
 *~
+*.orig
+*.rej
+
+# Lock files
+*.lock
+package-lock.json
+yarn.lock
+
+# Runtime files
+*.pid
+*.seed
+*.pid.lock
+
+# Dependency directories
+jspm_packages/
+
+# Optional npm cache directory
+.npm
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variables file
+.env
+
+# Stores VSCode versions used for testing VSCode extensions
+.vscode-test
+
+# Ignore specific TinhLinh temporary files
+Compiler_*.ll
+Compiler_*.exe
+Compiler_*.obj
+TinhCompiler_*.ll
+TinhCompiler_*.exe
+*_SelfHosted.*
+*_Bootstrap.*
+*_Fixed.*
+*_Test.*
+*_Debug.*
+
+# Ignore backup files
+*.li.backup
+*.li.bak
+*.li.orig
+
+# Ignore generated documentation
+docs/generated/
+api_docs/
+
+# Ignore performance test results
+perf_results/
+benchmarks/results/
+
+# Ignore local development files
+local_*
+dev_*
+scratch_*

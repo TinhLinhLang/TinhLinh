@@ -146,28 +146,63 @@ func process_escape_sequences(raw: str): str {
 }
 
 // Helper function to get keyword token type
-func get_keyword_type(text: str): int32 {
-    // Handle all keywords
+func check_basic_keywords(text: str): int32 {
     if (str_eq(text, "func")) { return FUNC() }
     if (str_eq(text, "let")) { return LET() }
     if (str_eq(text, "var")) { return VAR() }
     if (str_eq(text, "const")) { return CONST() }
     if (str_eq(text, "if")) { return IF() }
     if (str_eq(text, "else")) { return ELSE() }
+    return 0
+}
+
+func check_control_keywords(text: str): int32 {
     if (str_eq(text, "while")) { return WHILE() }
     if (str_eq(text, "for")) { return FOR() }
     if (str_eq(text, "return")) { return RETURN() }
     if (str_eq(text, "break")) { return BREAK() }
     if (str_eq(text, "continue")) { return CONTINUE() }
+    return 0
+}
+
+func check_type_keywords(text: str): int32 {
     if (str_eq(text, "struct")) { return STRUCT() }
     if (str_eq(text, "enum")) { return ENUM() }
     if (str_eq(text, "export")) { return EXPORT() }
     if (str_eq(text, "import")) { return IMPORT() }
+    return 0
+}
+
+func check_switch_keywords(text: str): int32 {
     if (str_eq(text, "switch")) { return SWITCH() }
     if (str_eq(text, "case")) { return CASE() }
     if (str_eq(text, "default")) { return DEFAULT() }
+    return 0
+}
+
+func check_literal_keywords(text: str): int32 {
     if (str_eq(text, "true")) { return TRUE() }
     if (str_eq(text, "false")) { return FALSE() }
+    if (str_eq(text, "and")) { return AND() }
+    if (str_eq(text, "or")) { return OR() }
+    return 0
+}
+
+func get_keyword_type(text: str): int32 {
+    let result: int32 = check_basic_keywords(text)
+    if (result != 0) { return result }
+    
+    result = check_control_keywords(text)
+    if (result != 0) { return result }
+    
+    result = check_type_keywords(text)
+    if (result != 0) { return result }
+    
+    result = check_switch_keywords(text)
+    if (result != 0) { return result }
+    
+    result = check_literal_keywords(text)
+    if (result != 0) { return result }
     
     return IDENTIFIER()
 }
