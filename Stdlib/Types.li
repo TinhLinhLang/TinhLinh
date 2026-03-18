@@ -1,0 +1,16 @@
+// Types.li - Core type definitions for TinhLinh
+
+// ptr is a generic pointer type (equivalent to void* in C)
+// This is a built-in type that maps to LLVM ptr
+// Usage: let p: ptr = malloc(100)
+
+// Note: In TinhLinh, 'ptr' is a keyword that represents a raw pointer
+// For safe smart pointers, use ptr<T> syntax
+// For unsafe raw pointers, use raw_ptr<T> syntax
+
+// Type aliases for common pointer types
+// (These will be implemented when type aliases are supported)
+
+// export type IntPtr = ptr<int32>
+// export type StrPtr = ptr<str>
+// export type VoidPtr = ptr
