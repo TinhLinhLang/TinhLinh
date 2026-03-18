@@ -411,6 +411,18 @@ func Parser_parse_switch(p: Parser): ASTNode {
 
 func Parser_parse_function(p: Parser, exported: bool): ASTNode {
     let tok: any = Parser_consume(p, IDENTIFIER(), "Expected function name")
+    
+    // Parse generic type parameters if present: <K, V>
+    let type_params: any = ptr_array_new()
+    if (Parser_match(p, LESS())) {
+        while (true) {
+            let param_tok: any = Parser_consume(p, IDENTIFIER(), "Expected type parameter name")
+            ptr_array_append(type_params, token_lexeme(param_tok))
+            if (!Parser_match(p, COMMA())) { break }
+        }
+        Parser_consume(p, GREATER(), "Expected '>' after type parameters")
+    }
+    
     Parser_consume(p, LPAREN(), "Expected '(' after function name")
     let params: any = ptr_array_new()
     if (!Parser_check(p, RPAREN())) {
@@ -436,12 +448,25 @@ func Parser_parse_function(p: Parser, exported: bool): ASTNode {
     node.args = params
     node.ty_name = ret_ty
     node.body = body
+    node.type_params = type_params
     node.is_exported = exported
     return node
 }
 
 func Parser_parse_struct(p: Parser, exported: bool): ASTNode {
     let tok: any = Parser_consume(p, IDENTIFIER(), "Expected struct name")
+    
+    // Parse generic type parameters if present: <K, V>
+    let type_params: any = ptr_array_new()
+    if (Parser_match(p, LESS())) {
+        while (true) {
+            let param_tok: any = Parser_consume(p, IDENTIFIER(), "Expected type parameter name")
+            ptr_array_append(type_params, token_lexeme(param_tok))
+            if (!Parser_match(p, COMMA())) { break }
+        }
+        Parser_consume(p, GREATER(), "Expected '>' after type parameters")
+    }
+    
     Parser_consume(p, LBRACE(), "Expected '{' after struct name")
     let fields: any = ptr_array_new()
     while (!Parser_check(p, RBRACE()) and !Parser_at_end(p)) {
@@ -451,6 +476,7 @@ func Parser_parse_struct(p: Parser, exported: bool): ASTNode {
     let node: ASTNode = AST_node_new(STMT_STRUCT(), token_line(tok), token_col(tok))
     node.name = token_lexeme(tok)
     node.args = fields
+    node.type_params = type_params
     node.is_exported = exported
     return node
 }
@@ -485,7 +511,27 @@ func Parser_parse_type(p: Parser): str {
         kind == FLOAT32_KW() or kind == FLOAT64_KW() or
         kind == STR_KW() or kind == BOOL_KW() or kind == VOID_KW() or kind == ANY_KW()) {
         Parser_advance(p)
-        return token_lexeme(tok)
+        let base_type: str = token_lexeme(tok)
+        
+        // Check for generic type arguments: Map<K, V>
+        if (Parser_match(p, LESS())) {
+            let type_str: str = base_type + "<"
+            let first: bool = true
+            while (true) {
+                if (!first) {
+                    type_str = type_str + ", "
+                }
+                first = false
+                let arg_type: str = Parser_parse_type(p)
+                type_str = type_str + arg_type
+                if (!Parser_match(p, COMMA())) { break }
+            }
+            Parser_consume(p, GREATER(), "Expected '>' after type arguments")
+            type_str = type_str + ">"
+            return type_str
+        }
+        
+        return base_type
     }
     
     print("Parser Error: Expected type name at line ", i32_to_str(token_line(tok)))

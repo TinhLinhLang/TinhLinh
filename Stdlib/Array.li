@@ -138,22 +138,22 @@ export func Array_index_of<T, N>(arr: Array<T, N>, value: T): int32 {
     return -1
 }
 
-// Convert to dynamic Array<T>
-export func Array_to_array<T, N>(arr: Array<T, N>): Array<T> {
-    let dyn_arr: Array<T> = Array_with_capacity<T>(N)
+// Convert to dynamic Vector<T>
+export func Array_to_vector<T, N>(arr: Array<T, N>): Vector<T> {
+    let dyn_arr: Vector<T> = Vector_with_capacity<T>(N)
     
     let i: int32 = 0
     while (i < N) {
         let value: T = Array_get<T, N>(arr, i)
-        Array_push<T>(dyn_arr, value)
+        Vector_push<T>(dyn_arr, value)
         i = i + 1
     }
     
     return dyn_arr
 }
 
-// Create from dynamic Array<T> (takes first N elements)
-export func Array_from_array<T, N>(src: Array<T>): Array<T, N> {
+// Create from dynamic Vector<T> (takes first N elements)
+export func Array_from_array<T, N>(src: Vector<T>): Array<T, N> {
     let fixed_arr: Array<T, N> = Array_new<T, N>()
     
     let count: int32 = len<T>(src)
@@ -163,7 +163,7 @@ export func Array_from_array<T, N>(src: Array<T>): Array<T, N> {
     
     let i: int32 = 0
     while (i < count) {
-        let value: T = Array_get<T>(src, i)
+        let value: T = Vector_get<T>(src, i)
         Array_set<T, N>(fixed_arr, i, value)
         i = i + 1
     }

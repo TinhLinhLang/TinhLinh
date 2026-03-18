@@ -1,0 +1,17 @@
+﻿// Minimal Bootstrap Compiler
+import "SimpleLexer.li"
+import "AST.li"
+
+func compile_simple(input: str, output: str): bool {
+    // Minimal compilation logic
+    return true
+}
+
+func main(): int32 {
+    // Simple main for testing
+    let result: bool = compile_simple("input.li", "output.ll")
+    if (result) {
+        return 0
+    }
+    return 1
+}

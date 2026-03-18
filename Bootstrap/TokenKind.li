@@ -1,0 +1,88 @@
+func EOF(): int32 { return 0 }
+func IDENTIFIER(): int32 { return 1 }
+func STRING(): int32 { return 2 }
+func INVALID(): int32 { return 3 }
+
+// Keywords
+func VAR(): int32 { return 10 }
+func LET(): int32 { return 11 }
+func CONST(): int32 { return 12 }
+func TOKEN_CONST(): int32 { return 12 }
+func TOKEN_CASE(): int32 { return 28 }
+func TOKEN_DEFAULT(): int32 { return 29 }
+func TOKEN_BREAK(): int32 { return 23 }
+func TOKEN_VAR(): int32 { return 10 }
+func TOKEN_LET(): int32 { return 11 }
+func FUNC(): int32 { return 13 }
+func IF(): int32 { return 14 }
+func ELSE(): int32 { return 15 }
+func WHILE(): int32 { return 16 }
+func FOR(): int32 { return 17 }
+func RETURN(): int32 { return 18 }
+func STRUCT(): int32 { return 19 }
+func ENUM(): int32 { return 20 }
+func EXPORT(): int32 { return 21 }
+func IMPORT(): int32 { return 22 }
+func BREAK(): int32 { return 23 }
+func CONTINUE(): int32 { return 24 }
+func TRUE(): int32 { return 25 }
+func FALSE(): int32 { return 26 }
+func SWITCH(): int32 { return 27 }
+func CASE(): int32 { return 28 }
+func DEFAULT(): int32 { return 29 }
+
+// Types (specific types only - no generic aliases)
+func STR_KW(): int32 { return 32 }
+func BOOL_KW(): int32 { return 33 }
+func VOID_KW(): int32 { return 35 }
+func ANY_KW(): int32 { return 36 }
+func BYTE_KW(): int32 { return 37 }
+
+// Note: Use specific types (int32, uint32, float32) instead of generic (int, uint, float)
+// This reduces ambiguity and makes type system more explicit
+
+// Punctuation
+func LPAREN(): int32 { return 40 }
+func RPAREN(): int32 { return 41 }
+func LBRACE(): int32 { return 42 }
+func RBRACE(): int32 { return 43 }
+func LBRACKET(): int32 { return 44 }
+func RBRACKET(): int32 { return 45 }
+func COLON(): int32 { return 46 }
+func COMMA(): int32 { return 47 }
+func DOT(): int32 { return 48 }
+func SEMI(): int32 { return 49 }
+func AT(): int32 { return 64 }  // @ symbol for decorators
+
+// Operators
+func ASSIGN(): int32 { return 50 }
+func PLUS(): int32 { return 51 }
+func MINUS(): int32 { return 52 }
+func STAR(): int32 { return 53 }
+func SLASH(): int32 { return 54 }
+func BANG(): int32 { return 55 }
+func EQUAL(): int32 { return 56 }
+func NOT_EQUAL(): int32 { return 57 }
+func LESS(): int32 { return 58 }
+func GREATER(): int32 { return 59 }
+func LESS_EQUAL(): int32 { return 60 }
+func GREATER_EQUAL(): int32 { return 61 }
+func AND(): int32 { return 62 }
+func OR(): int32 { return 63 }
+
+// More keywords
+func SKIP(): int32 { return 70 }
+
+// Extended integer types
+func INT8_KW(): int32 { return 80 }
+func INT16_KW(): int32 { return 81 }
+func INT32_KW(): int32 { return 82 }
+func INT64_KW(): int32 { return 83 }
+func UINT8_KW(): int32 { return 84 }
+func UINT16_KW(): int32 { return 85 }
+func UINT32_KW(): int32 { return 86 }
+func UINT64_KW(): int32 { return 87 }
+
+// Extended float types
+func FLOAT32_KW(): int32 { return 88 }
+func FLOAT64_KW(): int32 { return 89 }

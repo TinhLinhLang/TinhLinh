@@ -1,0 +1,54 @@
+﻿// Simplified Lexer for bootstrap
+import "TokenKind.li"
+import "AST.li"
+
+export struct Token {
+    kind: int32
+    lexeme: str
+    line: int32
+    col: int32
+}
+
+export struct Lexer {
+    source: str
+    pos: int32
+    line: int32
+    col: int32
+}
+
+func Lexer_new(source: str): Lexer {
+    let lexer: Lexer = Lexer {
+        source: source,
+        pos: 0,
+        line: 1,
+        col: 1
+    }
+    return lexer
+}
+
+// Simplified keyword checking - avoid complex if chains
+func check_keyword_simple(text: str): int32 {
+    // Use simple approach to avoid parser issues
+    let func_match: bool = str_eq(text, "func")
+    if (func_match) {
+        return FUNC()
+    }
+    
+    let let_match: bool = str_eq(text, "let")
+    if (let_match) {
+        return LET()
+    }
+    
+    let return_match: bool = str_eq(text, "return")
+    if (return_match) {
+        return RETURN()
+    }
+    
+    return IDENTIFIER()
+}
+
+func Lexer_scan_tokens(lexer: Lexer): any {
+    // Simplified implementation
+    let tokens: any = ptr_array_new()
+    return tokens
+}

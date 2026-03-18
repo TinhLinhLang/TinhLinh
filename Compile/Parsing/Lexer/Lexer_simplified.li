@@ -1,0 +1,323 @@
+﻿import "../AST/AST.li"
+import "TokenKind.li"
+
+export struct Token {
+    let t_kind: int32
+    let t_lexeme: str
+    let t_line: int32
+    let t_col: int32
+}
+
+func token_new(kind: int32, lexeme: str, line: int32, col: int32): Token {
+    return Token{kind, lexeme, line, col}
+}
+
+func token_type(t: Token): int32 { return t.t_kind }
+func token_lexeme(t: Token): str { return t.t_lexeme }
+func token_line(t: Token): int32 { return t.t_line }
+func token_col(t: Token): int32 { return t.t_col }
+
+export struct TokenArray {
+    let items: any
+}
+
+export struct Lexer {
+    let l_source: str
+    let l_source_len: int32
+    let l_start: int32
+    let l_current: int32
+    let l_line: int32
+    let l_col: int32
+    let l_tokens: TokenArray
+}
+
+func Lexer_new(source: str): Lexer {
+    let tokens: TokenArray = TokenArray{ptr_array_new()}
+    return Lexer{source, len(source), 0, 0, 1, 1, tokens}
+}
+
+func Lexer_at_end(l: Lexer): bool {
+    return l.l_current >= l.l_source_len
+}
+
+func Lexer_peek(l: Lexer): int32 {
+    if (Lexer_at_end(l)) { return 0 }
+    return charAt(l.l_source, l.l_current)
+}
+
+func Lexer_peek_next(l: Lexer): int32 {
+    if (l.l_current + 1 >= l.l_source_len) { return 0 }
+    return charAt(l.l_source, l.l_current + 1)
+}
+
+func Lexer_advance(l: Lexer): int32 {
+    let c: int32 = charAt(l.l_source, l.l_current)
+    l.l_current = l.l_current + 1
+    l.l_col = l.l_col + 1
+    return c
+}
+
+func Lexer_skip_whitespace(l: Lexer) {
+    while (!Lexer_at_end(l)) {
+        let c: int32 = Lexer_peek(l)
+        if (c == 32 or c == 9 or c == 13 or c == 10) {
+            if (c == 10) {
+                l.l_line = l.l_line + 1
+                l.l_col = 1
+            }
+            Lexer_advance(l)
+        }
+        else if (c == 47 and Lexer_peek_next(l) == 47) { // // comment
+            while (!Lexer_at_end(l) and Lexer_peek(l) != 10) {
+                Lexer_advance(l)
+            }
+        }
+        else if (c == 47 and Lexer_peek_next(l) == 42) { // /* comment
+            Lexer_advance(l) // /
+            Lexer_advance(l) // *
+            while (!Lexer_at_end(l) and !(Lexer_peek(l) == 42 and Lexer_peek_next(l) == 47)) {
+                if (Lexer_peek(l) == 10) {
+                    l.l_line = l.l_line + 1
+                    l.l_col = 1
+                }
+                Lexer_advance(l)
+            }
+            if (!Lexer_at_end(l)) {
+                Lexer_advance(l) // *
+                Lexer_advance(l) // /
+            }
+        }
+        else {
+            return
+        }
+    }
+}
+
+func is_digit(c: int32): bool { return c >= 48 and c <= 57 }
+func is_alpha(c: int32): bool { return (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 95 }
+func is_alphanumeric(c: int32): bool { return is_alpha(c) or is_digit(c) }
+
+// Process escape sequences in string
+func process_escape_sequences(raw: str): str {
+    let result: str = ""
+    let i: int32 = 0
+    let len_raw: int32 = len(raw)
+    
+    while (i < len_raw) {
+        let c: int32 = charAt(raw, i)
+        if (c == 92 and i + 1 < len_raw) {  // backslash
+            let next: int32 = charAt(raw, i + 1)
+            if (next == 110) {  // \n -> newline (ASCII 10)
+                result = result + substr("\n", 0, 1)
+                i = i + 2
+            }
+            else if (next == 116) {  // \t -> tab (ASCII 9)
+                result = result + substr("\t", 0, 1)
+                i = i + 2
+            }
+            else if (next == 114) {  // \r -> carriage return (ASCII 13)
+                result = result + substr("\r", 0, 1)
+                i = i + 2
+            }
+            else if (next == 92) {  // \\ -> backslash
+                result = result + "\\"
+                i = i + 2
+            }
+            else if (next == 34) {  // \" -> quote
+                result = result + "\""
+                i = i + 2
+            }
+            else if (next == 48) {  // \0 -> null
+                result = result + substr("\0", 0, 1)
+                i = i + 2
+            }
+            else {
+                // Unknown escape, keep both characters
+                result = result + substr(raw, i, 1)
+                i = i + 1
+            }
+        } else {
+            result = result + substr(raw, i, 1)
+            i = i + 1
+        }
+    }
+    
+    return result
+}
+
+// Helper function to get keyword token type
+func check_basic_keywords(text: str): int32 {
+    let match_FUNC = str_eq(text, "func"); if (match_FUNC) { return FUNC() }
+    let match_LET = str_eq(text, "let"); if (match_LET) { return LET() }
+    let match_VAR = str_eq(text, "var"); if (match_VAR) { return VAR() }
+    let match_CONST = str_eq(text, "const"); if (match_CONST) { return CONST() }
+    let match_IF = str_eq(text, "if"); if (match_IF) { return IF() }
+    let match_ELSE = str_eq(text, "else"); if (match_ELSE) { return ELSE() }
+    return 0
+}
+
+func check_control_keywords(text: str): int32 {
+    let match_WHILE = str_eq(text, "while"); if (match_WHILE) { return WHILE() }
+    let match_FOR = str_eq(text, "for"); if (match_FOR) { return FOR() }
+    let match_RETURN = str_eq(text, "return"); if (match_RETURN) { return RETURN() }
+    let match_BREAK = str_eq(text, "break"); if (match_BREAK) { return BREAK() }
+    let match_CONTINUE = str_eq(text, "continue"); if (match_CONTINUE) { return CONTINUE() }
+    return 0
+}
+
+func check_type_keywords(text: str): int32 {
+    let match_STRUCT = str_eq(text, "struct"); if (match_STRUCT) { return STRUCT() }
+    let match_ENUM = str_eq(text, "enum"); if (match_ENUM) { return ENUM() }
+    let match_EXPORT = str_eq(text, "export"); if (match_EXPORT) { return EXPORT() }
+    let match_IMPORT = str_eq(text, "import"); if (match_IMPORT) { return IMPORT() }
+    return 0
+}
+
+func check_switch_keywords(text: str): int32 {
+    let match_SWITCH = str_eq(text, "switch"); if (match_SWITCH) { return SWITCH() }
+    let match_CASE = str_eq(text, "case"); if (match_CASE) { return CASE() }
+    let match_DEFAULT = str_eq(text, "default"); if (match_DEFAULT) { return DEFAULT() }
+    return 0
+}
+
+func check_literal_keywords(text: str): int32 {
+    let match_TRUE = str_eq(text, "true"); if (match_TRUE) { return TRUE() }
+    let match_FALSE = str_eq(text, "false"); if (match_FALSE) { return FALSE() }
+    let match_AND = str_eq(text, "and"); if (match_AND) { return AND() }
+    let match_OR = str_eq(text, "or"); if (match_OR) { return OR() }
+    return 0
+}
+
+func get_keyword_type(text: str): int32 {
+    let result: int32 = check_basic_keywords(text)
+    if (result != 0) { return result }
+    
+    result = check_control_keywords(text)
+    if (result != 0) { return result }
+    
+    result = check_type_keywords(text)
+    if (result != 0) { return result }
+    
+    result = check_switch_keywords(text)
+    if (result != 0) { return result }
+    
+    result = check_literal_keywords(text)
+    if (result != 0) { return result }
+    
+    return IDENTIFIER()
+}
+
+func Lexer_scan_token(l: Lexer): Token {
+    Lexer_skip_whitespace(l)
+    l.l_start = l.l_current
+    if (Lexer_at_end(l)) { return token_new(EOF(), "", l.l_line, l.l_col) }
+
+    let c: int32 = Lexer_advance(l)
+
+    if (is_alpha(c)) {
+        while (is_alphanumeric(Lexer_peek(l))) { Lexer_advance(l) }
+        let text: str = substr(l.l_source, l.l_start, l.l_current - l.l_start)
+        let kind: int32 = get_keyword_type(text)
+        return token_new(kind, text, l.l_line, l.l_col)
+    }
+
+    if (is_digit(c)) {
+        while (is_digit(Lexer_peek(l))) { Lexer_advance(l) }
+        let text: str = substr(l.l_source, l.l_start, l.l_current - l.l_start)
+        return token_new(IDENTIFIER(), text, l.l_line, l.l_col)
+    }
+
+    if (c == 34) { // " string
+        while (!Lexer_at_end(l) and Lexer_peek(l) != 34) {
+            if (Lexer_peek(l) == 10) { l.l_line = l.l_line + 1; l.l_col = 1 }
+            Lexer_advance(l)
+        }
+        if (Lexer_at_end(l)) { return token_new(INVALID(), "Unterminated string", l.l_line, l.l_col) }
+        Lexer_advance(l) // closing quote
+        let text: str = substr(l.l_source, l.l_start + 1, l.l_current - l.l_start - 2)
+        let processed: str = process_escape_sequences(text)
+        return token_new(STRING(), processed, l.l_line, l.l_col)
+    }
+
+    if (c == 61) { // = or ==
+        if (Lexer_peek(l) == 61) { 
+            Lexer_advance(l)
+            return token_new(EQUAL(), "==", l.l_line, l.l_col-2) 
+        }
+        return token_new(ASSIGN(), "=", l.l_line, l.l_col-1)
+    }
+    else if (c == 33) { // ! or !=
+        if (Lexer_peek(l) == 61) { 
+            Lexer_advance(l)
+            return token_new(NOT_EQUAL(), "!=", l.l_line, l.l_col-2) 
+        }
+        return token_new(BANG(), "!", l.l_line, l.l_col-1)
+    }
+    else if (c == 60) { // < or <=
+        if (Lexer_peek(l) == 61) { 
+            Lexer_advance(l)
+            return token_new(LESS_EQUAL(), "<=", l.l_line, l.l_col-2) 
+        }
+        return token_new(LESS(), "<", l.l_line, l.l_col-1)
+    }
+    else if (c == 62) { // > or >=
+        if (Lexer_peek(l) == 61) { 
+            Lexer_advance(l)
+            return token_new(GREATER_EQUAL(), ">=", l.l_line, l.l_col-2) 
+        }
+        return token_new(GREATER(), ">", l.l_line, l.l_col-1)
+    }
+    else if (c == 38) { // & or &&
+        if (Lexer_peek(l) == 38) { 
+            Lexer_advance(l)
+            return token_new(AND(), "&&", l.l_line, l.l_col-2) 
+        }
+        // break equivalent - fall through to end
+    }
+    else if (c == 124) { // | or ||
+        if (Lexer_peek(l) == 124) { 
+            Lexer_advance(l)
+            return token_new(OR(), "||", l.l_line, l.l_col-2) 
+        }
+        // break equivalent - fall through to end
+    }
+    else if (c == 43) { return token_new(PLUS(), "+", l.l_line, l.l_col-1) }
+    else if (c == 45) { return token_new(MINUS(), "-", l.l_line, l.l_col-1) }
+    else if (c == 42) { return token_new(STAR(), "*", l.l_line, l.l_col-1) }
+    else if (c == 47) { return token_new(SLASH(), "/", l.l_line, l.l_col-1) }
+    else if (c == 40) { return token_new(LPAREN(), "(", l.l_line, l.l_col-1) }
+    else if (c == 41) { return token_new(RPAREN(), ")", l.l_line, l.l_col-1) }
+    else if (c == 123) { return token_new(LBRACE(), "{", l.l_line, l.l_col-1) }
+    else if (c == 125) { return token_new(RBRACE(), "}", l.l_line, l.l_col-1) }
+    else if (c == 91) { return token_new(LBRACKET(), "[", l.l_line, l.l_col-1) }
+    else if (c == 93) { return token_new(RBRACKET(), "]", l.l_line, l.l_col-1) }
+    else if (c == 44) { return token_new(COMMA(), ",", l.l_line, l.l_col-1) }
+    else if (c == 46) { return token_new(DOT(), ".", l.l_line, l.l_col-1) }
+    else if (c == 58) { return token_new(COLON(), ":", l.l_line, l.l_col-1) }
+    else if (c == 59) { return token_new(SEMI(), ";", l.l_line, l.l_col-1) }
+    else if (c == 64) { return token_new(AT(), "@", l.l_line, l.l_col-1) }
+
+    return token_new(INVALID(), "Unexpected character", l.l_line, l.l_col)
+}
+
+func Lexer_scan_tokens(l: Lexer): TokenArray {
+    while (!Lexer_at_end(l)) {
+        let tok: Token = Lexer_scan_token(l)
+        if (tok.t_kind != INVALID()) {
+            ptr_array_append(l.l_tokens.items, tok)
+        }
+    }
+    ptr_array_append(l.l_tokens.items, token_new(EOF(), "", l.l_line, l.l_col))
+    return l.l_tokens
+}
+
+func token_array_len(a: TokenArray): int32 {
+    return ptr_array_len(a.items)
+}
+
+func token_array_get(a: TokenArray, i: int32): any {
+    return ptr_array_get(a.items, i)
+}
+
+
+

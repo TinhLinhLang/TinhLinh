@@ -8,6 +8,20 @@ func normalize_type_name(ty_name: str): str {
     return ty_name  // Return as-is for other types
 }
 
+// Strip generic parameters from function/type names
+// Example: "Map_new<K, V>" -> "Map_new"
+func strip_generic_params(name: str): str {
+    let i: int32 = 0
+    let len_name: int32 = len(name)
+    while (i < len_name) {
+        if (charAt(name, i) == 60) {  // '<' character
+            return substr(name, 0, i)
+        }
+        i = i + 1
+    }
+    return name
+}
+
 func check_expr_constants(name: str): bool {
     if (str_eq(name, "EXPR_LITERAL")) { return true }
     if (str_eq(name, "EXPR_VARIABLE")) { return true }
@@ -252,8 +266,11 @@ export struct FunctionSignature {
 }
 
 func get_function_signature(name: str): FunctionSignature {
+    // Strip generic parameters first: Map_new<K, V> -> Map_new
+    let base_name: str = strip_generic_params(name)
+    
     // Runtime functions with name mapping
-    if (str_eq(name, "len")) { return FunctionSignature{"i32", "p", true, "tinh_strlen"} }
+    if (str_eq(base_name, "len")) { return FunctionSignature{"i32", "p", true, "tinh_strlen"} }
     if (str_eq(name, "substr")) { return FunctionSignature{"ptr", "pii", true, "tinh_substr"} }
     if (str_eq(name, "charAt")) { return FunctionSignature{"i32", "pi", true, "tinh_char_at"} }
     if (str_eq(name, "readFile")) { return FunctionSignature{"ptr", "p", true, "tinh_read_file"} }
@@ -320,26 +337,27 @@ func get_function_signature(name: str): FunctionSignature {
     if (str_eq(name, "Parser_parse_switch")) { return FunctionSignature{"ptr", "p", false, "Parser_parse_switch"} }
     if (str_eq(name, "Parser_parse_function")) { return FunctionSignature{"ptr", "pp", false, "Parser_parse_function"} }
     if (str_eq(name, "Parser_parse_struct")) { return FunctionSignature{"ptr", "pp", false, "Parser_parse_struct"} }
-    if (str_eq(name, "Parser_parse_enum")) { return FunctionSignature{"ptr", "pp", false, "Parser_parse_enum"} }
-    if (str_eq(name, "Parser_parse_statement")) { return FunctionSignature{"ptr", "p", false, "Parser_parse_statement"} }
-    if (str_eq(name, "Parser_parse_type")) { return FunctionSignature{"ptr", "p", false, "Parser_parse_type"} }
+    if (str_eq(base_name, "Parser_parse_enum")) { return FunctionSignature{"ptr", "pp", false, base_name} }
+    if (str_eq(base_name, "Parser_parse_statement")) { return FunctionSignature{"ptr", "p", false, base_name} }
+    if (str_eq(base_name, "Parser_parse_type")) { return FunctionSignature{"ptr", "p", false, base_name} }
     
     // Lexer functions
-    if (str_eq(name, "Lexer_scan_token")) { return FunctionSignature{"ptr", "p", false, "Lexer_scan_token"} }
+    if (str_eq(base_name, "Lexer_scan_token")) { return FunctionSignature{"ptr", "p", false, base_name} }
     
     // AST functions
-    if (str_eq(name, "AST_node_new")) { return FunctionSignature{"ptr", "iii", false, "AST_node_new"} }
+    if (str_eq(base_name, "AST_node_new")) { return FunctionSignature{"ptr", "iii", false, base_name} }
     
     // Specific function signatures for user-defined functions
-    if (str_eq(name, "get_base_dir")) { return FunctionSignature{"ptr", "p", false, "get_base_dir"} }
-    if (str_eq(name, "compile_file")) { return FunctionSignature{"i1", "pp", false, "compile_file"} }
+    if (str_eq(base_name, "get_base_dir")) { return FunctionSignature{"ptr", "p", false, base_name} }
+    if (str_eq(base_name, "compile_file")) { return FunctionSignature{"i1", "pp", false, base_name} }
     
     // Default for unknown functions - assume ptr return type for capitalized names
-    let first_char: int32 = charAt(name, 0)
+    // Use base_name (without generic parameters) for LLVM function name
+    let first_char: int32 = charAt(base_name, 0)
     if (first_char >= 65 and first_char <= 90) {
-        return FunctionSignature{"ptr", "", false, name}
+        return FunctionSignature{"ptr", "", false, base_name}
     }
-    return FunctionSignature{"i32", "", false, name}
+    return FunctionSignature{"i32", "", false, base_name}
 }
 
 func CodeGen_generate_expr(cg: CodeGen, node: ASTNode): str {
@@ -1013,24 +1031,38 @@ func CodeGen_generate_stmt(cg: CodeGen, node: ASTNode) {
 }
 
 func get_llvm_type(ty: str): str {
+    // Strip generic parameters: Map<K, V> -> Map
+    let base_type: str = ty
+    let i: int32 = 0
+    let len_ty: int32 = len(ty)
+    while (i < len_ty) {
+        if (charAt(ty, i) == 60) {  // '<' character
+            base_type = substr(ty, 0, i)
+            break
+        }
+        i = i + 1
+    }
+    
     // Handle type aliases first
-    if (str_eq(ty, "int") or str_eq(ty, "int32") or str_eq(ty, "bool")) { return "i32" }
-    if (str_eq(ty, "uint") or str_eq(ty, "uint32")) { return "i32" }
-    if (str_eq(ty, "float") or str_eq(ty, "float32")) { return "float" }
+    if (str_eq(base_type, "int") or str_eq(base_type, "int32") or str_eq(base_type, "bool")) { return "i32" }
+    if (str_eq(base_type, "uint") or str_eq(base_type, "uint32")) { return "i32" }
+    if (str_eq(base_type, "float") or str_eq(base_type, "float32")) { return "float" }
     
     // Specific sized types
-    if (str_eq(ty, "int8")) { return "i8" }
-    if (str_eq(ty, "int16")) { return "i16" }
-    if (str_eq(ty, "int64")) { return "i64" }
-    if (str_eq(ty, "uint8")) { return "i8" }
-    if (str_eq(ty, "uint16")) { return "i16" }
-    if (str_eq(ty, "uint64")) { return "i64" }
-    if (str_eq(ty, "float64")) { return "double" }
+    if (str_eq(base_type, "int8")) { return "i8" }
+    if (str_eq(base_type, "int16")) { return "i16" }
+    if (str_eq(base_type, "int64")) { return "i64" }
+    if (str_eq(base_type, "uint8")) { return "i8" }
+    if (str_eq(base_type, "uint16")) { return "i16" }
+    if (str_eq(base_type, "uint64")) { return "i64" }
+    if (str_eq(base_type, "float64")) { return "double" }
     
     // Other types
-    if (str_eq(ty, "str")) { return "ptr" }
-    if (str_eq(ty, "any")) { return "ptr" }
-    if (str_eq(ty, "void") or str_eq(ty, "")) { return "void" }
+    if (str_eq(base_type, "str")) { return "ptr" }
+    if (str_eq(base_type, "any")) { return "ptr" }
+    if (str_eq(base_type, "void") or str_eq(base_type, "")) { return "void" }
+    
+    // Generic types and custom structs -> ptr
     return "ptr"
 }
 
@@ -1106,11 +1138,16 @@ func CodeGen_run(cg: CodeGen, stmts: any): str {
     
     // Find @main() decorator if exists
     let main_node: any = 0
+    let has_user_main: bool = false
     i = 0
     while (i < n) {
         let node: ASTNode = ptr_array_get(stmts, i)
         if (node != 0 and node.n_kind == STMT_MAIN()) {
             main_node = node
+        }
+        // Check if user defined a main() function
+        if (node != 0 and node.n_kind == STMT_FUNC() and str_eq(node.name, "main")) {
+            has_user_main = true
         }
         i = i + 1
     }
@@ -1126,28 +1163,31 @@ func CodeGen_run(cg: CodeGen, stmts: any): str {
         i = i + 1
     }
     
-    // Generate main() function
-    CodeGen_emit_raw(cg, "define i32 @main(i32 %argc, ptr %argv) {")
-    CodeGen_emit_raw(cg, "entry:")
-    CodeGen_emit(cg, "call void @tinh_runtime_init(i32 %argc, ptr %argv)")
-    
-    if (main_node != 0) {
-        // Execute @main() block
-        CodeGen_generate_stmt(cg, main_node.body)
-    } else {
-        // Execute all top-level statements (old behavior)
-        i = 0
-        while (i < n) {
-            let node: ASTNode = ptr_array_get(stmts, i)
-            if (node != 0 and node.n_kind != STMT_FUNC() and node.n_kind != STMT_STRUCT() and node.n_kind != STMT_IMPORT() and node.n_kind != STMT_ENUM()) {
-                CodeGen_generate_stmt(cg, node)
+    // Generate main() wrapper only if user didn't define main()
+    // If user has main(), it should have signature: func main(): int32
+    if (has_user_main == false) {
+        CodeGen_emit_raw(cg, "define i32 @main(i32 %argc, ptr %argv) {")
+        CodeGen_emit_raw(cg, "entry:")
+        CodeGen_emit(cg, "call void @tinh_runtime_init(i32 %argc, ptr %argv)")
+        
+        if (main_node != 0) {
+            // Execute @main() block
+            CodeGen_generate_stmt(cg, main_node.body)
+        } else {
+            // Execute all top-level statements (old behavior)
+            i = 0
+            while (i < n) {
+                let node: ASTNode = ptr_array_get(stmts, i)
+                if (node != 0 and node.n_kind != STMT_FUNC() and node.n_kind != STMT_STRUCT() and node.n_kind != STMT_IMPORT() and node.n_kind != STMT_ENUM()) {
+                    CodeGen_generate_stmt(cg, node)
+                }
+                i = i + 1
             }
-            i = i + 1
         }
+        
+        CodeGen_emit(cg, "ret i32 0")
+        CodeGen_emit_raw(cg, "}")
     }
-    
-    CodeGen_emit(cg, "ret i32 0")
-    CodeGen_emit_raw(cg, "}")
 
     let ds: str = "declare void @tinh_runtime_init(i32, ptr)\n"
     ds = ds + "declare void @tinh_println_str(ptr)\n"

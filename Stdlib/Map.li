@@ -1,0 +1,316 @@
+export struct Map<K, V> {
+    let buckets: any
+    let bucket_count: int32
+    let size: int32
+    let max_load_percent: int32
+    let key_mode: int32
+}
+
+export func Map_KEY_MODE_DEFAULT(): int32 { return 0 }
+export func Map_KEY_MODE_STR(): int32 { return 1 }
+export func Map_STATE_EMPTY(): int32 { return 0 }
+export func Map_STATE_OCCUPIED(): int32 { return 1 }
+export func Map_STATE_DELETED(): int32 { return 2 }
+
+func Map_slot_size(): int32 { return 24 }
+func Map_slot_key_offset(): int32 { return 0 }
+func Map_slot_value_offset(): int32 { return 8 }
+func Map_slot_state_offset(): int32 { return 16 }
+
+func Map_abs_i32(v: int32): int32 {
+    if (v < 0) {
+        return 0 - v
+    }
+    return v
+}
+
+func Map_hash_i32(v: int32): int32 {
+    let h: int32 = v * 1103515245 + 12345
+    return Map_abs_i32(h)
+}
+
+func Map_hash_str(s: str): int32 {
+    let h: int32 = 5381
+    let i: int32 = 0
+    let n: int32 = len(s)
+    while (i < n) {
+        let c: int32 = charAt(s, i)
+        h = h * 33 + c
+        i = i + 1
+    }
+    return Map_abs_i32(h)
+}
+
+func Map_index_from_hash(hash: int32, bucket_count: int32): int32 {
+    if (bucket_count <= 0) {
+        return 0
+    }
+    let div: int32 = hash / bucket_count
+    return hash - div * bucket_count
+}
+
+func Map_slot_base<K, V>(m: Map<K, V>, index: int32): any {
+    let offset: int32 = index * Map_slot_size()
+    return tinh_ptr_add(m.buckets, offset)
+}
+
+func Map_slot_key_ptr<K, V>(m: Map<K, V>, index: int32): any {
+    let base: any = Map_slot_base<K, V>(m, index)
+    return tinh_ptr_add(base, Map_slot_key_offset())
+}
+
+func Map_slot_value_ptr<K, V>(m: Map<K, V>, index: int32): any {
+    let base: any = Map_slot_base<K, V>(m, index)
+    return tinh_ptr_add(base, Map_slot_value_offset())
+}
+
+func Map_slot_state_ptr<K, V>(m: Map<K, V>, index: int32): any {
+    let base: any = Map_slot_base<K, V>(m, index)
+    return tinh_ptr_add(base, Map_slot_state_offset())
+}
+
+func Map_get_state<K, V>(m: Map<K, V>, index: int32): int32 {
+    return tinh_ptr_load(Map_slot_state_ptr<K, V>(m, index))
+}
+
+func Map_set_state<K, V>(m: Map<K, V>, index: int32, state: int32) {
+    tinh_ptr_store(Map_slot_state_ptr<K, V>(m, index), state)
+}
+
+func Map_get_key<K, V>(m: Map<K, V>, index: int32): K {
+    return tinh_ptr_load(Map_slot_key_ptr<K, V>(m, index))
+}
+
+func Map_set_key<K, V>(m: Map<K, V>, index: int32, key: K) {
+    tinh_ptr_store(Map_slot_key_ptr<K, V>(m, index), key)
+}
+
+func Map_get_value<K, V>(m: Map<K, V>, index: int32): V {
+    return tinh_ptr_load(Map_slot_value_ptr<K, V>(m, index))
+}
+
+func Map_set_value<K, V>(m: Map<K, V>, index: int32, value: V) {
+    tinh_ptr_store(Map_slot_value_ptr<K, V>(m, index), value)
+}
+
+func Map_init_storage<K, V>(data: any, bucket_count: int32) {
+    let i: int32 = 0
+    while (i < bucket_count) {
+        let base: any = tinh_ptr_add(data, i * Map_slot_size())
+        tinh_ptr_store(tinh_ptr_add(base, Map_slot_state_offset()), Map_STATE_EMPTY())
+        i = i + 1
+    }
+}
+
+export func Map_new_with_mode<K, V>(bucket_count: int32, key_mode: int32): Map<K, V> {
+    let n: int32 = bucket_count
+    if (n < 8) {
+        n = 8
+    }
+    let bytes: int32 = n * Map_slot_size()
+    let data: any = malloc(bytes)
+    Map_init_storage<K, V>(data, n)
+    return Map<K, V>{data, n, 0, 70, key_mode}
+}
+
+export func Map_new<K, V>(): Map<K, V> {
+    return Map_new_with_mode<K, V>(16, Map_KEY_MODE_DEFAULT())
+}
+
+export func Map_with_capacity<K, V>(bucket_count: int32): Map<K, V> {
+    return Map_new_with_mode<K, V>(bucket_count, Map_KEY_MODE_DEFAULT())
+}
+
+export func Map_new_str<V>(): Map<str, V> {
+    return Map_new_with_mode<str, V>(16, Map_KEY_MODE_STR())
+}
+
+export func Map_with_capacity_str<V>(bucket_count: int32): Map<str, V> {
+    return Map_new_with_mode<str, V>(bucket_count, Map_KEY_MODE_STR())
+}
+
+func Map_hash_key<K, V>(m: Map<K, V>, key: K): int32 {
+    if (m.key_mode == Map_KEY_MODE_STR()) {
+        return Map_hash_str(ptr(key))
+    }
+    return Map_hash_i32(int32(key))
+}
+
+func Map_keys_equal<K, V>(m: Map<K, V>, a: K, b: K): bool {
+    if (m.key_mode == Map_KEY_MODE_STR()) {
+        return str_eq(ptr(a), ptr(b))
+    }
+    return a == b
+}
+
+func Map_probe_index(start: int32, step: int32, bucket_count: int32): int32 {
+    let idx: int32 = start + step
+    if (idx >= bucket_count) {
+        return idx - bucket_count
+    }
+    return idx
+}
+
+func Map_find_slot_for_get<K, V>(m: Map<K, V>, key: K): int32 {
+    let hash: int32 = Map_hash_key<K, V>(m, key)
+    let start: int32 = Map_index_from_hash(hash, m.bucket_count)
+    let step: int32 = 0
+    while (step < m.bucket_count) {
+        let idx: int32 = Map_probe_index(start, step, m.bucket_count)
+        let state: int32 = Map_get_state<K, V>(m, idx)
+        if (state == Map_STATE_EMPTY()) {
+            return -1
+        }
+        if (state == Map_STATE_OCCUPIED()) {
+            let current_key: K = Map_get_key<K, V>(m, idx)
+            if (Map_keys_equal<K, V>(m, current_key, key)) {
+                return idx
+            }
+        }
+        step = step + 1
+    }
+    return -1
+}
+
+func Map_find_slot_for_put<K, V>(m: Map<K, V>, key: K): int32 {
+    let hash: int32 = Map_hash_key<K, V>(m, key)
+    let start: int32 = Map_index_from_hash(hash, m.bucket_count)
+    let step: int32 = 0
+    let first_deleted: int32 = -1
+    while (step < m.bucket_count) {
+        let idx: int32 = Map_probe_index(start, step, m.bucket_count)
+        let state: int32 = Map_get_state<K, V>(m, idx)
+        if (state == Map_STATE_EMPTY()) {
+            if (first_deleted != -1) {
+                return first_deleted
+            }
+            return idx
+        }
+        if (state == Map_STATE_DELETED()) {
+            if (first_deleted == -1) {
+                first_deleted = idx
+            }
+        } else {
+            let current_key: K = Map_get_key<K, V>(m, idx)
+            if (Map_keys_equal<K, V>(m, current_key, key)) {
+                return idx
+            }
+        }
+        step = step + 1
+    }
+    return first_deleted
+}
+
+func Map_should_rehash<K, V>(m: Map<K, V>): bool {
+    let left: int32 = (m.size + 1) * 100
+    let right: int32 = m.bucket_count * m.max_load_percent
+    return left > right
+}
+
+func Map_insert_no_rehash<K, V>(m: Map<K, V>, key: K, value: V): bool {
+    let idx: int32 = Map_find_slot_for_put<K, V>(m, key)
+    if (idx < 0) {
+        return false
+    }
+    let state: int32 = Map_get_state<K, V>(m, idx)
+    if (state == Map_STATE_OCCUPIED()) {
+        Map_set_value<K, V>(m, idx, value)
+        return false
+    }
+    Map_set_key<K, V>(m, idx, key)
+    Map_set_value<K, V>(m, idx, value)
+    Map_set_state<K, V>(m, idx, Map_STATE_OCCUPIED())
+    return true
+}
+
+func Map_rehash<K, V>(m: Map<K, V>) {
+    let old_buckets: any = m.buckets
+    let old_count: int32 = m.bucket_count
+    let new_count: int32 = old_count * 2
+    let new_bytes: int32 = new_count * Map_slot_size()
+    let new_buckets: any = malloc(new_bytes)
+    Map_init_storage<K, V>(new_buckets, new_count)
+    m.buckets = new_buckets
+    m.bucket_count = new_count
+    m.size = 0
+
+    let i: int32 = 0
+    while (i < old_count) {
+        let old_base: any = tinh_ptr_add(old_buckets, i * Map_slot_size())
+        let old_state: int32 = tinh_ptr_load(tinh_ptr_add(old_base, Map_slot_state_offset()))
+        if (old_state == Map_STATE_OCCUPIED()) {
+            let key: K = tinh_ptr_load(tinh_ptr_add(old_base, Map_slot_key_offset()))
+            let value: V = tinh_ptr_load(tinh_ptr_add(old_base, Map_slot_value_offset()))
+            if (Map_insert_no_rehash<K, V>(m, key, value)) {
+                m.size = m.size + 1
+            }
+        }
+        i = i + 1
+    }
+    free(old_buckets)
+}
+
+export func Map_put<K, V>(m: Map<K, V>, key: K, value: V) {
+    if (Map_should_rehash<K, V>(m)) {
+        Map_rehash<K, V>(m)
+    }
+    if (Map_insert_no_rehash<K, V>(m, key, value)) {
+        m.size = m.size + 1
+    }
+}
+
+export func Map_get<K, V>(m: Map<K, V>, key: K): V {
+    let idx: int32 = Map_find_slot_for_get<K, V>(m, key)
+    if (idx < 0) {
+        return tinh_i32_to_ptr(0)
+    }
+    return Map_get_value<K, V>(m, idx)
+}
+
+export func Map_get_or<K, V>(m: Map<K, V>, key: K, fallback: V): V {
+    let idx: int32 = Map_find_slot_for_get<K, V>(m, key)
+    if (idx < 0) {
+        return fallback
+    }
+    return Map_get_value<K, V>(m, idx)
+}
+
+export func Map_contains<K, V>(m: Map<K, V>, key: K): bool {
+    return Map_find_slot_for_get<K, V>(m, key) >= 0
+}
+
+export func Map_remove<K, V>(m: Map<K, V>, key: K): bool {
+    let idx: int32 = Map_find_slot_for_get<K, V>(m, key)
+    if (idx < 0) {
+        return false
+    }
+    Map_set_state<K, V>(m, idx, Map_STATE_DELETED())
+    m.size = m.size - 1
+    return true
+}
+
+export func Map_len<K, V>(m: Map<K, V>): int32 {
+    return m.size
+}
+
+export func Map_capacity<K, V>(m: Map<K, V>): int32 {
+    return m.bucket_count
+}
+
+export func Map_is_empty<K, V>(m: Map<K, V>): bool {
+    return m.size == 0
+}
+
+export func Map_clear<K, V>(m: Map<K, V>) {
+    Map_init_storage<K, V>(m.buckets, m.bucket_count)
+    m.size = 0
+}
+
+export func Map_drop<K, V>(m: Map<K, V>) {
+    if (m.buckets != tinh_i32_to_ptr(0)) {
+        free(m.buckets)
+        m.buckets = tinh_i32_to_ptr(0)
+        m.bucket_count = 0
+        m.size = 0
+    }
+}
