@@ -141,10 +141,26 @@ export struct CodeGen {
     let last_temp_is_ptr: int32  // 0 = i32, 1 = ptr
     let last_temp_is_i1: int32   // 0 = not i1, 1 = i1 (boolean result)
     let has_return: int32        // 0 = no return, 1 = has return
+    
+    // Symbol table for variable types
+    let var_count: int32         // Number of variables tracked
+    let var_names: int32         // Pointer to array of variable names (ptr to str array)
+    let var_types: int32         // Pointer to array of LLVM types (ptr to str array)
+    
+    // Function return type tracking
+    let func_count: int32        // Number of functions tracked
+    let func_names: int32        // Pointer to array of function names
+    let func_return_types: int32 // Pointer to array of return types
 }
 
 func CodeGen_new(): CodeGen {
-    return CodeGen{"", "", 0, 0, 0, "  ", "i32", 0, 0, 0}
+    // Initialize symbol tables with ptr_array
+    let var_names: int32 = ptr_array_new()
+    let var_types: int32 = ptr_array_new()
+    let func_names: int32 = ptr_array_new()
+    let func_return_types: int32 = ptr_array_new()
+    
+    return CodeGen{"", "", 0, 0, 0, "  ", "i32", 0, 0, 0, 0, var_names, var_types, 0, func_names, func_return_types}
 }
 
 func CodeGen_next_temp(cg: CodeGen): str {
@@ -201,6 +217,58 @@ func is_numeric(s: str): bool {
     if (len(s) == 0) { return false }
     let c: int32 = charAt(s, 0)
     return c >= 48 and c <= 57
+}
+
+// Symbol table functions for variable types
+func CodeGen_add_var_type(cg: CodeGen, name: str, llvm_type: str) {
+    ptr_array_append(cg.var_names, name)
+    ptr_array_append(cg.var_types, llvm_type)
+    cg.var_count = cg.var_count + 1
+}
+
+func CodeGen_lookup_var_type(cg: CodeGen, name: str): str {
+    let i: int32 = 0
+    while (i < cg.var_count) {
+        let stored_name: str = ptr_array_get(cg.var_names, i)
+        if (str_eq(stored_name, name)) {
+            return ptr_array_get(cg.var_types, i)
+        }
+        i = i + 1
+    }
+    return "i32"  // Default fallback
+}
+
+// Symbol table functions for function return types
+func CodeGen_add_func_type(cg: CodeGen, name: str, return_type: str) {
+    ptr_array_append(cg.func_names, name)
+    ptr_array_append(cg.func_return_types, return_type)
+    cg.func_count = cg.func_count + 1
+}
+
+func CodeGen_lookup_func_return_type(cg: CodeGen, name: str): str {
+    let i: int32 = 0
+    while (i < cg.func_count) {
+        let stored_name: str = ptr_array_get(cg.func_names, i)
+        if (str_eq(stored_name, name)) {
+            return ptr_array_get(cg.func_return_types, i)
+        }
+        i = i + 1
+    }
+    
+    // Check for built-in functions
+    if (str_eq(name, "malloc")) { return "ptr" }
+    if (str_eq(name, "free")) { return "void" }
+    if (str_eq(name, "ptr_read_i32")) { return "i32" }
+    if (str_eq(name, "ptr_write_i32")) { return "void" }
+    if (str_eq(name, "ptr_add_i32")) { return "ptr" }
+    if (str_eq(name, "memset")) { return "void" }
+    if (str_eq(name, "memcpy")) { return "void" }
+    if (str_eq(name, "memcmp")) { return "i32" }
+    if (str_eq(name, "mempool_create")) { return "ptr" }
+    if (str_eq(name, "mempool_alloc")) { return "ptr" }
+    if (str_eq(name, "mempool_destroy")) { return "void" }
+    
+    return "i32"  // Default fallback
 }
 
 func get_astnode_field_offset(name: str): int32 {
@@ -437,10 +505,10 @@ func CodeGen_generate_expr(cg: CodeGen, node: ASTNode): str {
     }
     else if (kind == EXPR_VARIABLE()) {
         let res: str = CodeGen_next_temp(cg)
-        let load_type: str = "i32"
-        if (str_eq(node.name, "input") or str_eq(node.name, "output") or str_eq(node.name, "input_file") or str_eq(node.name, "output_file") or str_eq(node.name, "input_path") or str_eq(node.name, "output_path") or str_eq(node.name, "name") or str_eq(node.name, "value") or str_eq(node.name, "lexeme") or str_eq(node.name, "ty_name") or str_eq(node.name, "source") or str_eq(node.name, "text") or str_eq(node.name, "content") or str_eq(node.name, "lexer") or str_eq(node.name, "tokens") or str_eq(node.name, "parser") or str_eq(node.name, "cg") or str_eq(node.name, "stmts") or str_eq(node.name, "args") or str_eq(node.name, "params") or str_eq(node.name, "ir") or str_eq(node.name, "base_dir") or str_eq(node.name, "mm") or str_eq(node.name, "resolved_path") or str_eq(node.name, "import_path") or str_eq(node.name, "escaped") or str_eq(node.name, "llvm_str") or str_eq(node.name, "raw") or str_eq(node.name, "g_name") or str_eq(node.name, "res") or str_eq(node.name, "result") or str_eq(node.name, "lhs") or str_eq(node.name, "rhs") or str_eq(node.name, "actual_name") or str_eq(node.name, "ret_ty") or str_eq(node.name, "param_types") or str_eq(node.name, "args_str") or str_eq(node.name, "load_type") or str_eq(node.name, "l1") or str_eq(node.name, "l2") or str_eq(node.name, "l3") or str_eq(node.name, "ds") or str_eq(node.name, "functions") or str_eq(node.name, "mod") or str_eq(node.name, "main_module") or str_eq(node.name, "current_stmts") or str_eq(node.name, "new_to_process") or str_eq(node.name, "to_process") or str_eq(node.name, "imports") or str_eq(node.name, "all_stmts") or str_eq(node.name, "mod_lexer") or str_eq(node.name, "mod_tokens") or str_eq(node.name, "mod_parser") or str_eq(node.name, "mod_stmts") or str_eq(node.name, "l") or str_eq(node.name, "t") or str_eq(node.name, "p") or str_eq(node.name, "node") or str_eq(node.name, "tok") or str_eq(node.name, "param") or str_eq(node.name, "expr") or str_eq(node.name, "stmt")) {
-            load_type = "ptr"
-        }
+        
+        // Lookup type from symbol table
+        let load_type: str = CodeGen_lookup_var_type(cg, node.name)
+        
         CodeGen_emit(cg, res + " = load " + load_type + ", ptr %" + node.name)
         if (str_eq(load_type, "ptr")) {
             CodeGen_set_last_type_ptr(cg)
@@ -895,6 +963,9 @@ func CodeGen_generate_stmt(cg: CodeGen, node: ASTNode) {
         let var_type: str = get_llvm_type(normalized_type)
         if (str_eq(var_type, "void")) { var_type = "i32" }
         
+        // Add to symbol table
+        CodeGen_add_var_type(cg, node.name, var_type)
+        
         // Debug output
         CodeGen_emit_raw(cg, "; DEBUG: original type = " + node.ty_name + ", normalized = " + normalized_type + ", llvm = " + var_type)
         
@@ -1094,6 +1165,7 @@ func get_llvm_type(ty: str): str {
     
     // Other types
     if (str_eq(base_type, "str")) { return "ptr" }
+    if (str_eq(base_type, "ptr")) { return "ptr" }
     if (str_eq(base_type, "any")) { return "ptr" }
     if (str_eq(base_type, "void") or str_eq(base_type, "")) { return "void" }
     
@@ -1111,6 +1183,9 @@ func CodeGen_generate_function(cg: CodeGen, node: ASTNode): str {
     let ret_type: str = get_llvm_type(normalize_type_name(node.ty_name))
     cg.current_func_return_type = ret_type
     let func_name: str = node.name
+    
+    // Add function return type to symbol table
+    CodeGen_add_func_type(cg, func_name, ret_type)
     
     let params_str: str = ""
     let n_params: int32 = ptr_array_len(node.args)
@@ -1130,6 +1205,10 @@ func CodeGen_generate_function(cg: CodeGen, node: ASTNode): str {
     while (i < n_params) {
         let param: ASTNode = ptr_array_get(node.args, i)
         let param_type: str = get_llvm_type(normalize_type_name(param.ty_name))
+        
+        // Add parameter to symbol table
+        CodeGen_add_var_type(cg, param.name, param_type)
+        
         CodeGen_emit(cg, "%" + param.name + " = alloca " + param_type)
         CodeGen_emit(cg, "store " + param_type + " %arg_" + param.name + ", ptr %" + param.name)
         i = i + 1
