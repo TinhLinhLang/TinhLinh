@@ -1179,6 +1179,7 @@ func CodeGen_generate_function(cg: CodeGen, node: ASTNode): str {
     cg.temp_count = 0
     cg.label_count = 0
     cg.has_return = 0  // Reset return flag
+    cg.var_count = 0   // Reset variable symbol table for new function
     
     let ret_type: str = get_llvm_type(normalize_type_name(node.ty_name))
     cg.current_func_return_type = ret_type
