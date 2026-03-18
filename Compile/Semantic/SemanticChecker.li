@@ -1,14 +1,17 @@
 import "../Parsing/AST/AST.li"
 
-// Semantic checker for var/let/const enforcement
+// Semantic checker for var/let/const enforcement and unsafe checking
 export struct SemanticChecker {
     let var_storage: any    // Map: var_name -> storage_type ("var", "let", "const")
     let var_types: any      // Map: var_name -> type
     let errors: any         // Array of error messages
+    let in_unsafe_block: bool     // Track if we're in an @unsafe block
+    let in_unsafe_function: bool  // Track if we're in an @unsafe function
+    let unsafe_functions: any     // Set of unsafe function names
 }
 
 func SemanticChecker_new(): SemanticChecker {
-    return SemanticChecker{ptr_array_new(), ptr_array_new(), ptr_array_new()}
+    return SemanticChecker{ptr_array_new(), ptr_array_new(), ptr_array_new(), false, false, ptr_array_new()}
 }
 
 // Register a variable declaration
@@ -88,6 +91,65 @@ func SemanticChecker_get_error(sc: SemanticChecker, idx: int32): str {
     return ptr_array_get(sc.errors, idx)
 }
 
+// Check if we're in unsafe context
+func SemanticChecker_in_unsafe_context(sc: SemanticChecker): bool {
+    return sc.in_unsafe_block or sc.in_unsafe_function
+}
+
+// Register an unsafe function
+func SemanticChecker_register_unsafe_func(sc: SemanticChecker, name: str) {
+    ptr_array_append(sc.unsafe_functions, name)
+}
+
+// Check if a function is unsafe
+func SemanticChecker_is_unsafe_func(sc: SemanticChecker, name: str): bool {
+    let n: int32 = ptr_array_len(sc.unsafe_functions)
+    let i: int32 = 0
+    while (i < n) {
+        let fname: str = ptr_array_get(sc.unsafe_functions, i)
+        if (str_eq(fname, name)) {
+            return true
+        }
+        i = i + 1
+    }
+    return false
+}
+
+// Check if a type is a raw pointer
+func SemanticChecker_is_raw_ptr_type(ty: str): bool {
+    if (len(ty) < 8) { return false }
+    // Check if type starts with "raw_ptr<"
+    if (charAt(ty, 0) == 114 and  // 'r'
+        charAt(ty, 1) == 97 and   // 'a'
+        charAt(ty, 2) == 119 and  // 'w'
+        charAt(ty, 3) == 95 and   // '_'
+        charAt(ty, 4) == 112 and  // 'p'
+        charAt(ty, 5) == 116 and  // 't'
+        charAt(ty, 6) == 114 and  // 'r'
+        charAt(ty, 7) == 60) {    // '<'
+        return true
+    }
+    return false
+}
+
+// Check raw_ptr usage
+func SemanticChecker_check_raw_ptr_usage(sc: SemanticChecker, ty: str, line: int32) {
+    if (SemanticChecker_is_raw_ptr_type(ty)) {
+        if (!SemanticChecker_in_unsafe_context(sc)) {
+            SemanticChecker_add_error(sc, "Error at line " + i32_to_str(line) + ": raw_ptr can only be used in @unsafe context")
+        }
+    }
+}
+
+// Check unsafe function call
+func SemanticChecker_check_unsafe_call(sc: SemanticChecker, func_name: str, line: int32) {
+    if (SemanticChecker_is_unsafe_func(sc, func_name)) {
+        if (!SemanticChecker_in_unsafe_context(sc)) {
+            SemanticChecker_add_error(sc, "Error at line " + i32_to_str(line) + ": unsafe function '" + func_name + "' must be called from @unsafe context")
+        }
+    }
+}
+
 // Check a statement recursively
 func SemanticChecker_check_stmt(sc: SemanticChecker, node: ASTNode) {
     if (node == 0) { return }
@@ -99,11 +161,30 @@ func SemanticChecker_check_stmt(sc: SemanticChecker, node: ASTNode) {
         let var_type: str = node.ty_name
         if (str_eq(var_type, "")) { var_type = "inferred" }
         
+        // Check if raw_ptr is used outside unsafe context
+        SemanticChecker_check_raw_ptr_usage(sc, var_type, node.n_line)
+        
         SemanticChecker_declare_var(sc, node.name, storage_type, var_type)
         
         if (node.initializer != 0) {
             SemanticChecker_check_expr(sc, node.initializer)
         }
+    }
+    else if (kind == STMT_UNSAFE()) {
+        // Enter unsafe block
+        let was_in_unsafe: bool = sc.in_unsafe_block
+        sc.in_unsafe_block = true
+        
+        // Check statements inside unsafe block
+        let n: int32 = ptr_array_len(node.body)
+        let i: int32 = 0
+        while (i < n) {
+            SemanticChecker_check_stmt(sc, ptr_array_get(node.body, i))
+            i = i + 1
+        }
+        
+        // Exit unsafe block
+        sc.in_unsafe_block = was_in_unsafe
     }
     else if (kind == STMT_EXPR()) {
         SemanticChecker_check_expr(sc, node.left)
@@ -133,9 +214,24 @@ func SemanticChecker_check_stmt(sc: SemanticChecker, node: ASTNode) {
         }
     }
     else if (kind == STMT_FUNC()) {
+        // Register unsafe function
+        if (node.is_unsafe) {
+            SemanticChecker_register_unsafe_func(sc, node.name)
+        }
+        
+        // Enter unsafe function if marked @unsafe
+        let was_in_unsafe_func: bool = sc.in_unsafe_function
+        if (node.is_unsafe) {
+            sc.in_unsafe_function = true
+        }
+        
+        // Check function body
         if (node.body != 0) {
             SemanticChecker_check_stmt(sc, node.body)
         }
+        
+        // Exit unsafe function
+        sc.in_unsafe_function = was_in_unsafe_func
     }
 }
 
@@ -163,6 +259,9 @@ func SemanticChecker_check_expr(sc: SemanticChecker, node: ASTNode) {
         SemanticChecker_check_expr(sc, node.right)
     }
     else if (kind == EXPR_CALL()) {
+        // Check if calling unsafe function
+        SemanticChecker_check_unsafe_call(sc, node.name, node.n_line)
+        
         let n: int32 = ptr_array_len(node.args)
         let i: int32 = 0
         while (i < n) {

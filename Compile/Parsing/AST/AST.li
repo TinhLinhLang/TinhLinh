@@ -23,6 +23,7 @@ func STMT_CASE(): int32 { return 21 }
 func STMT_DEFAULT(): int32 { return 22 }
 func STMT_BREAK(): int32 { return 23 }
 func STMT_MAIN(): int32 { return 24 }  // @main() decorator
+func STMT_UNSAFE(): int32 { return 25 }  // @unsafe block
 
 export struct ASTNode {
     let n_kind: int32
@@ -44,10 +45,11 @@ export struct ASTNode {
     let type_params: any  // Generic type parameters like <K, V>
     let member_of: str
     let is_exported: bool
+    let is_unsafe: bool  // For unsafe functions and blocks
 }
 
 func AST_node_new(kind: int32, line: int32, col: int32): ASTNode {
-    return ASTNode{kind, line, col, "", "", "", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "", false}
+    return ASTNode{kind, line, col, "", "", "", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "", false, false}
 }
 
 func str_eq(a: str, b: str): bool {

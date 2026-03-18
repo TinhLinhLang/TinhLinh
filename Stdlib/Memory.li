@@ -1,0 +1,200 @@
+// Memory.li - Low-level memory management utilities
+// All operations are unsafe
+
+// Allocate memory (returns raw pointer)
+@unsafe export func malloc(size: int32): ptr {
+    // This will call tinh_malloc from runtime
+    return tinh_malloc(size)
+}
+
+// Free memory
+@unsafe export func free(ptr: ptr): void {
+    // This will call tinh_free from runtime
+    if (ptr != 0) {
+        tinh_free(ptr)
+    }
+}
+
+// Allocate zeroed memory
+@unsafe export func calloc(count: int32, size: int32): ptr {
+    let total_size: int32 = count * size
+    let ptr: ptr = malloc(total_size)
+    if (ptr != 0) {
+        memset(ptr, 0, total_size)
+    }
+    return ptr
+}
+
+// Reallocate memory
+@unsafe export func realloc(ptr: ptr, new_size: int32): ptr {
+    if (ptr == 0) {
+        return malloc(new_size)
+    }
+    
+    let new_ptr: ptr = malloc(new_size)
+    if (new_ptr == 0) {
+        return 0
+    }
+    
+    // Copy old data to new location
+    // Note: We don't know the old size, so this is unsafe
+    // In real implementation, we'd track allocation sizes
+    
+    free(ptr)
+    return new_ptr
+}
+
+// Copy memory from src to dest
+@unsafe export func memcpy(dest: ptr, src: ptr, size: int32): void {
+    let i: int32 = 0
+    while (i < size) {
+        let byte: int32 = ptr_read_byte(src, i)
+        ptr_write_byte(dest, i, byte)
+        i = i + 1
+    }
+}
+
+// Set memory to a value
+@unsafe export func memset(ptr: ptr, value: int32, size: int32): void {
+    let i: int32 = 0
+    while (i < size) {
+        ptr_write_byte(ptr, i, value)
+        i = i + 1
+    }
+}
+
+// Compare two memory regions
+@unsafe export func memcmp(a: ptr, b: ptr, size: int32): int32 {
+    let i: int32 = 0
+    while (i < size) {
+        let byte_a: int32 = ptr_read_byte(a, i)
+        let byte_b: int32 = ptr_read_byte(b, i)
+        if (byte_a != byte_b) {
+            return byte_a - byte_b
+        }
+        i = i + 1
+    }
+    return 0
+}
+
+// Move memory (handles overlapping regions)
+@unsafe export func memmove(dest: ptr, src: ptr, size: int32): void {
+    // Check if regions overlap
+    let dest_addr: int32 = ptr_to_int(dest)
+    let src_addr: int32 = ptr_to_int(src)
+    
+    if (dest_addr < src_addr) {
+        // Copy forward
+        memcpy(dest, src, size)
+    } else if (dest_addr > src_addr) {
+        // Copy backward to handle overlap
+        let i: int32 = size - 1
+        while (i >= 0) {
+            let byte: int32 = ptr_read_byte(src, i)
+            ptr_write_byte(dest, i, byte)
+            i = i - 1
+        }
+    }
+    // If dest_addr == src_addr, no copy needed
+}
+
+// Helper functions for byte-level access
+@unsafe func ptr_read_byte(ptr: ptr, offset: int32): int32 {
+    // This will be implemented in runtime
+    return 0
+}
+
+@unsafe func ptr_write_byte(ptr: ptr, offset: int32, value: int32): void {
+    // This will be implemented in runtime
+}
+
+@unsafe func ptr_to_int(ptr: ptr): int32 {
+    // This will be implemented in runtime
+    return 0
+}
+
+// Alignment utilities
+@unsafe export func align_up(size: int32, alignment: int32): int32 {
+    let remainder: int32 = size % alignment
+    if (remainder == 0) {
+        return size
+    }
+    return size + (alignment - remainder)
+}
+
+@unsafe export func align_down(size: int32, alignment: int32): int32 {
+    return (size / alignment) * alignment
+}
+
+@unsafe export func is_aligned(ptr: ptr, alignment: int32): bool {
+    let addr: int32 = ptr_to_int(ptr)
+    return (addr % alignment) == 0
+}
+
+// Memory statistics (for debugging)
+struct MemStats {
+    let total_allocated: int32
+    let total_freed: int32
+    let current_usage: int32
+    let allocation_count: int32
+}
+
+let global_mem_stats: MemStats = MemStats{0, 0, 0, 0}
+
+@unsafe export func mem_stats_record_alloc(size: int32): void {
+    global_mem_stats.total_allocated = global_mem_stats.total_allocated + size
+    global_mem_stats.current_usage = global_mem_stats.current_usage + size
+    global_mem_stats.allocation_count = global_mem_stats.allocation_count + 1
+}
+
+@unsafe export func mem_stats_record_free(size: int32): void {
+    global_mem_stats.total_freed = global_mem_stats.total_freed + size
+    global_mem_stats.current_usage = global_mem_stats.current_usage - size
+}
+
+@unsafe export func mem_stats_print(): void {
+    println_str("Memory Statistics:")
+    print_str("  Total allocated: ")
+    println_str(i32_to_str(global_mem_stats.total_allocated))
+    print_str("  Total freed: ")
+    println_str(i32_to_str(global_mem_stats.total_freed))
+    print_str("  Current usage: ")
+    println_str(i32_to_str(global_mem_stats.current_usage))
+    print_str("  Allocation count: ")
+    println_str(i32_to_str(global_mem_stats.allocation_count))
+}
+
+// Memory pool for fast allocation
+struct MemPool {
+    let pool_ptr: ptr
+    let pool_size: int32
+    let used: int32
+}
+
+@unsafe export func mempool_create(size: int32): MemPool {
+    let pool_ptr: ptr = malloc(size)
+    return MemPool{pool_ptr, size, 0}
+}
+
+@unsafe export func mempool_alloc(pool: MemPool, size: int32): ptr {
+    if (pool.used + size > pool.pool_size) {
+        return 0  // Pool exhausted
+    }
+    
+    let ptr: ptr = ptr_add_bytes(pool.pool_ptr, pool.used)
+    pool.used = pool.used + size
+    return ptr
+}
+
+@unsafe export func mempool_reset(pool: MemPool): void {
+    pool.used = 0
+}
+
+@unsafe export func mempool_destroy(pool: MemPool): void {
+    free(pool.pool_ptr)
+}
+
+@unsafe func ptr_add_bytes(ptr: ptr, bytes: int32): ptr {
+    // This will be implemented in runtime
+    return ptr
+}

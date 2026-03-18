@@ -188,6 +188,13 @@ func check_literal_keywords(text: str): int32 {
     return 0
 }
 
+func check_memory_safety_keywords(text: str): int32 {
+    if (str_eq(text, "unsafe")) { return UNSAFE() }
+    if (str_eq(text, "ptr")) { return PTR() }
+    if (str_eq(text, "raw_ptr")) { return RAW_PTR() }
+    return 0
+}
+
 func get_keyword_type(text: str): int32 {
     let result: int32 = check_basic_keywords(text)
     if (result != 0) { return result }
@@ -202,6 +209,9 @@ func get_keyword_type(text: str): int32 {
     if (result != 0) { return result }
     
     result = check_literal_keywords(text)
+    if (result != 0) { return result }
+    
+    result = check_memory_safety_keywords(text)
     if (result != 0) { return result }
     
     return IDENTIFIER()

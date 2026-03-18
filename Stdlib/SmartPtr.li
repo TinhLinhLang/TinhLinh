@@ -1,0 +1,93 @@
+// SmartPtr.li - Safe smart pointer implementation
+// ptr<T> provides unique ownership with automatic cleanup
+
+// Create a new smart pointer with a value
+export func ptr_new_i32(value: int32): ptr {
+    let p: ptr = malloc(4)
+    ptr_write_i32(p, value)
+    return p
+}
+
+export func ptr_new_str(value: str): ptr {
+    // String is already a pointer, just return it
+    return value
+}
+
+// Dereference a pointer to get its value
+export func ptr_deref_i32(p: ptr): int32 {
+    if (ptr_is_null(p)) {
+        println_str("Error: Null pointer dereference")
+        return 0
+    }
+    return ptr_read_i32(p)
+}
+
+export func ptr_deref_str(p: ptr): str {
+    if (ptr_is_null(p)) {
+        println_str("Error: Null pointer dereference")
+        return ""
+    }
+    return p
+}
+
+// Check if pointer is null
+export func ptr_is_null(p: ptr): bool {
+    // Compare pointer with null (0)
+    return p == 0
+}
+
+// Free a pointer (manual cleanup for now)
+export func ptr_drop(p: ptr): void {
+    if (!ptr_is_null(p)) {
+        free(p)
+    }
+}
+
+// Helper functions for pointer operations
+func ptr_write_i32(p: ptr, value: int32): void {
+    @unsafe {
+        let raw: raw_ptr<int32> = p
+        raw_ptr_write_i32(raw, value)
+    }
+}
+
+func ptr_read_i32(p: ptr): int32 {
+    @unsafe {
+        let raw: raw_ptr<int32> = p
+        return raw_ptr_read_i32(raw)
+    }
+}
+
+// Generic pointer creation (returns untyped ptr)
+export func ptr_malloc(size: int32): ptr {
+    return malloc(size)
+}
+
+// Clone a pointer (creates a new allocation with same value)
+export func ptr_clone_i32(p: ptr): ptr {
+    if (ptr_is_null(p)) {
+        return 0
+    }
+    let value: int32 = ptr_deref_i32(p)
+    return ptr_new_i32(value)
+}
+
+// Swap two pointers
+export func ptr_swap(a: ptr, b: ptr): void {
+    let temp: ptr = a
+    a = b
+    b = temp
+}
+
+// Compare two pointers for equality
+export func ptr_eq(a: ptr, b: ptr): bool {
+    return a == b
+}
+
+// Get raw pointer address (for debugging)
+export func ptr_addr(p: ptr): int32 {
+    @unsafe {
+        let raw: raw_ptr<int32> = p
+        return raw_ptr_to_int(raw)
+    }
+}

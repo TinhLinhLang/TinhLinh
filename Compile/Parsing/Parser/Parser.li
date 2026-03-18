@@ -330,6 +330,19 @@ func Parser_parse_block(p: Parser): ASTNode {
     return node
 }
 
+func Parser_parse_unsafe_block(p: Parser): ASTNode {
+    let tok: any = Parser_consume(p, LBRACE(), "Expected '{' after @unsafe")
+    let stmts: any = ptr_array_new()
+    while (!Parser_check(p, RBRACE()) and !Parser_at_end(p)) {
+        ptr_array_append(stmts, Parser_parse_statement(p))
+    }
+    Parser_consume(p, RBRACE(), "Expected '}' after unsafe block")
+    let node: ASTNode = AST_node_new(STMT_UNSAFE(), token_line(tok), token_col(tok))
+    node.body = stmts
+    node.is_unsafe = true
+    return node
+}
+
 func Parser_parse_if(p: Parser): ASTNode {
     let tok: any = token_array_get(p.p_tokens, p.p_current - 1)
     Parser_consume(p, LPAREN(), "Expected '(' after if")
@@ -504,6 +517,16 @@ func Parser_parse_type(p: Parser): str {
     let tok: any = Parser_peek(p)
     let kind: int32 = token_type(tok)
     
+    // Check for ptr<T> or raw_ptr<T>
+    if (kind == PTR() or kind == RAW_PTR()) {
+        Parser_advance(p)
+        let ptr_keyword: str = token_lexeme(tok)
+        Parser_consume(p, LESS(), "Expected '<' after pointer type")
+        let inner_type: str = Parser_parse_type(p)
+        Parser_consume(p, GREATER(), "Expected '>' after pointer inner type")
+        return ptr_keyword + "<" + inner_type + ">"
+    }
+    
     // Accept IDENTIFIER or any type keyword
     if (kind == IDENTIFIER() or 
         kind == INT8_KW() or kind == INT16_KW() or kind == INT32_KW() or kind == INT64_KW() or
@@ -539,6 +562,17 @@ func Parser_parse_type(p: Parser): str {
 }
 
 func Parser_parse_statement(p: Parser): ASTNode {
+    // Check for @unsafe annotation
+    if (Parser_match(p, AT())) {
+        let tok: any = token_array_get(p.p_tokens, p.p_current - 1)
+        let annotation: any = Parser_consume(p, IDENTIFIER(), "Expected annotation name after @")
+        if (str_eq(token_lexeme(annotation), "unsafe")) {
+            return Parser_parse_unsafe_block(p)
+        }
+        // Unknown annotation, skip it
+        print("Parser Warning: Unknown annotation @", token_lexeme(annotation))
+    }
+    
     if (Parser_check(p, LBRACE())) {
         return Parser_parse_block(p)
     }
@@ -599,8 +633,9 @@ func Parser_parse_program(p: Parser): any {
     let stmts: any = ptr_array_new()
     while (!Parser_at_end(p)) {
         let exported: bool = Parser_match(p, EXPORT())
+        let is_unsafe: bool = false
         
-        // Handle @main() decorator
+        // Handle @ decorators
         if (Parser_match(p, AT())) {
             let decorator_name: any = Parser_consume(p, IDENTIFIER(), "Expected decorator name after @")
             if (str_eq(token_lexeme(decorator_name), "main")) {
@@ -611,15 +646,21 @@ func Parser_parse_program(p: Parser): any {
                 node.body = body
                 ptr_array_append(stmts, node)
             }
+            else if (str_eq(token_lexeme(decorator_name), "unsafe")) {
+                is_unsafe = true
+            }
         }
-        else if (Parser_match(p, IMPORT())) {
+        
+        if (Parser_match(p, IMPORT())) {
             let path: any = Parser_consume(p, STRING(), "Expected import path")
             let node: ASTNode = AST_node_new(STMT_IMPORT(), token_line(path), token_col(path))
             node.value = token_lexeme(path)
             ptr_array_append(stmts, node)
         }
         else if (Parser_match(p, FUNC())) {
-            ptr_array_append(stmts, Parser_parse_function(p, exported))
+            let func_node: ASTNode = Parser_parse_function(p, exported)
+            func_node.is_unsafe = is_unsafe
+            ptr_array_append(stmts, func_node)
         }
         else if (Parser_match(p, STRUCT())) {
             ptr_array_append(stmts, Parser_parse_struct(p, exported))

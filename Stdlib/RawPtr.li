@@ -1,0 +1,128 @@
+// RawPtr.li - Unsafe raw pointer operations
+// raw_ptr<T> provides low-level memory access (unsafe only)
+
+// All functions in this file are unsafe and must be called from @unsafe context
+
+// Create a null raw pointer
+@unsafe export func raw_ptr_null(): raw_ptr<int32> {
+    return 0
+}
+
+// Check if raw pointer is null
+@unsafe export func raw_ptr_is_null(p: raw_ptr<int32>): bool {
+    return p == 0
+}
+
+// Read value from raw pointer
+@unsafe export func raw_ptr_read_i32(p: raw_ptr<int32>): int32 {
+    // This will be implemented in runtime
+    // For now, treat as opaque pointer operation
+    return 0
+}
+
+// Write value to raw pointer
+@unsafe export func raw_ptr_write_i32(p: raw_ptr<int32>, value: int32): void {
+    // This will be implemented in runtime
+    // For now, treat as opaque pointer operation
+}
+
+// Pointer arithmetic - offset by n elements
+@unsafe export func raw_ptr_offset_i32(p: raw_ptr<int32>, offset: int32): raw_ptr<int32> {
+    // Calculate byte offset: offset * sizeof(int32) = offset * 4
+    let byte_offset: int32 = offset * 4
+    return raw_ptr_add_bytes(p, byte_offset)
+}
+
+// Add bytes to pointer
+@unsafe export func raw_ptr_add_bytes(p: raw_ptr<int32>, bytes: int32): raw_ptr<int32> {
+    // This will be implemented in runtime
+    return p
+}
+
+// Convert raw pointer to integer (for debugging)
+@unsafe export func raw_ptr_to_int(p: raw_ptr<int32>): int32 {
+    // This will be implemented in runtime
+    return 0
+}
+
+// Convert integer to raw pointer (dangerous!)
+@unsafe export func int_to_raw_ptr(addr: int32): raw_ptr<int32> {
+    // This will be implemented in runtime
+    return 0
+}
+
+// Copy memory from src to dest
+@unsafe export func raw_ptr_copy(dest: raw_ptr<int32>, src: raw_ptr<int32>, count: int32): void {
+    let i: int32 = 0
+    while (i < count) {
+        let value: int32 = raw_ptr_read_i32(raw_ptr_offset_i32(src, i))
+        raw_ptr_write_i32(raw_ptr_offset_i32(dest, i), value)
+        i = i + 1
+    }
+}
+
+// Set memory to a value
+@unsafe export func raw_ptr_set(p: raw_ptr<int32>, value: int32, count: int32): void {
+    let i: int32 = 0
+    while (i < count) {
+        raw_ptr_write_i32(raw_ptr_offset_i32(p, i), value)
+        i = i + 1
+    }
+}
+
+// Compare two memory regions
+@unsafe export func raw_ptr_compare(a: raw_ptr<int32>, b: raw_ptr<int32>, count: int32): bool {
+    let i: int32 = 0
+    while (i < count) {
+        let val_a: int32 = raw_ptr_read_i32(raw_ptr_offset_i32(a, i))
+        let val_b: int32 = raw_ptr_read_i32(raw_ptr_offset_i32(b, i))
+        if (val_a != val_b) {
+            return false
+        }
+        i = i + 1
+    }
+    return true
+}
+
+// Swap values at two pointers
+@unsafe export func raw_ptr_swap(a: raw_ptr<int32>, b: raw_ptr<int32>): void {
+    let temp: int32 = raw_ptr_read_i32(a)
+    raw_ptr_write_i32(a, raw_ptr_read_i32(b))
+    raw_ptr_write_i32(b, temp)
+}
+
+// Cast raw pointer to different type (very unsafe!)
+@unsafe export func raw_ptr_cast_to_u8(p: raw_ptr<int32>): raw_ptr<u8> {
+    return p
+}
+
+@unsafe export func raw_ptr_cast_to_i32(p: raw_ptr<u8>): raw_ptr<int32> {
+    return p
+}
+
+// Byte-level operations
+@unsafe export func raw_ptr_read_u8(p: raw_ptr<u8>): int32 {
+    // Read single byte
+    return 0
+}
+
+@unsafe export func raw_ptr_write_u8(p: raw_ptr<u8>, value: int32): void {
+    // Write single byte
+}
+
+// Alignment helpers
+@unsafe export func raw_ptr_align(p: raw_ptr<int32>, alignment: int32): raw_ptr<int32> {
+    let addr: int32 = raw_ptr_to_int(p)
+    let remainder: int32 = addr % alignment
+    if (remainder == 0) {
+        return p
+    }
+    let offset: int32 = alignment - remainder
+    return raw_ptr_add_bytes(p, offset)
+}
+
+// Check if pointer is aligned
+@unsafe export func raw_ptr_is_aligned(p: raw_ptr<int32>, alignment: int32): bool {
+    let addr: int32 = raw_ptr_to_int(p)
+    return (addr % alignment) == 0
+}
