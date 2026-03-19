@@ -1,0 +1,164 @@
+// Monomorphization - Generate specialized functions for generics
+import "../Parsing/AST/AST.li"
+
+// Extract type parameters from generic name
+// "identity<T>" → "T"
+// "Map_new<K, V>" → "K, V"
+func extract_type_params(name: str): str {
+    let start: int32 = 0
+    let len_name: int32 = len(name)
+    let i: int32 = 0
+    
+    // Find '<'
+    while (i < len_name) {
+        if (charAt(name, i) == 60) {  // '<'
+            start = i + 1
+            break
+        }
+        i = i + 1
+    }
+    
+    if (start == 0) {
+        return ""  // No type parameters
+    }
+    
+    // Find '>'
+    let end: int32 = start
+    while (end < len_name) {
+        if (charAt(name, end) == 62) {  // '>'
+            break
+        }
+        end = end + 1
+    }
+    
+    return substr(name, start, end - start)
+}
+
+// Get base name without type parameters
+// "identity<T>" → "identity"
+// "Map_new<K, V>" → "Map_new"
+func get_base_name(name: str): str {
+    let len_name: int32 = len(name)
+    let i: int32 = 0
+    
+    while (i < len_name) {
+        if (charAt(name, i) == 60) {  // '<'
+            return substr(name, 0, i)
+        }
+        i = i + 1
+    }
+    
+    return name
+}
+
+// Mangle type name for function name
+// "int32" → "i32"
+// "str" → "str"
+func mangle_type(ty: str): str {
+    if (str_eq(ty, "int32")) { return "i32" }
+    if (str_eq(ty, "int64")) { return "i64" }
+    if (str_eq(ty, "float32")) { return "f32" }
+    if (str_eq(ty, "float64")) { return "f64" }
+    if (str_eq(ty, "bool")) { return "bool" }
+    if (str_eq(ty, "str")) { return "str" }
+    if (str_eq(ty, "ptr")) { return "ptr" }
+    
+    // For complex types, just use as-is for now
+    return ty
+}
+
+// Generate specialized function name
+// "identity", "int32" → "identity_i32"
+// "Map_new", "int32, int32" → "Map_new_i32_i32"
+func generate_specialized_name(base: str, type_args: str): str {
+    let result: str = base
+    
+    // Parse type_args and mangle each type
+    let len_args: int32 = len(type_args)
+    let i: int32 = 0
+    let current_type: str = ""
+    
+    while (i < len_args) {
+        let c: int32 = charAt(type_args, i)
+        
+        if (c == 44 or c == 32) {  // ',' or ' '
+            if (len(current_type) > 0) {
+                result = result + "_" + mangle_type(current_type)
+                current_type = ""
+            }
+        } else {
+            current_type = current_type + char_to_str(c)
+        }
+        
+        i = i + 1
+    }
+    
+    // Add last type
+    if (len(current_type) > 0) {
+        result = result + "_" + mangle_type(current_type)
+    }
+    
+    return result
+}
+
+// Check if function is generic
+func is_generic_function(node: ASTNode): bool {
+    if (node.n_kind != STMT_FUNC()) {
+        return false
+    }
+    
+    let name: str = node.name
+    let len_name: int32 = len(name)
+    let i: int32 = 0
+    
+    while (i < len_name) {
+        if (charAt(name, i) == 60) {  // '<'
+            return true
+        }
+        i = i + 1
+    }
+    
+    return false
+}
+
+// Check if function call is generic
+func is_generic_call(node: ASTNode): bool {
+    if (node.n_kind != EXPR_CALL()) {
+        return false
+    }
+    
+    let name: str = node.name
+    let len_name: int32 = len(name)
+    let i: int32 = 0
+    
+    while (i < len_name) {
+        if (charAt(name, i) == 60) {  // '<'
+            return true
+        }
+        i = i + 1
+    }
+    
+    return false
+}
+
+// Simple monomorphization: just replace generic names with specialized names
+// Full implementation would clone AST and substitute types
+export func monomorphize_simple(stmts: any): any {
+    // For now, just return statements as-is
+    // Full implementation in Phase 2
+    return stmts
+}
+
+// Helper: Convert char to string
+func char_to_str(c: int32): str {
+    // This is a placeholder - need proper implementation
+    if (c == 95) { return "_" }  // '_'
+    if (c == 60) { return "<" }  // '<'
+    if (c == 62) { return ">" }  // '>'
+    if (c == 44) { return "," }  // ','
+    if (c == 32) { return " " }  // ' '
+    
+    // For alphanumeric, would need proper char to string conversion
+    // This is simplified
+    return ""
+}
