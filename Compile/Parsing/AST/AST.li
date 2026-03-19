@@ -17,6 +17,7 @@ func STMT_FUNC(): int32 { return 15 }
 func STMT_STRUCT(): int32 { return 16 }
 func STMT_ENUM(): int32 { return 17 }
 func STMT_IMPORT(): int32 { return 18 }
+func STMT_IMPORTC(): int32 { return 26 }
 func STMT_RETURN(): int32 { return 19 }
 func STMT_SWITCH(): int32 { return 20 }
 func STMT_CASE(): int32 { return 21 }

@@ -23,6 +23,7 @@ func STRUCT(): int32 { return 19 }
 func ENUM(): int32 { return 20 }
 func EXPORT(): int32 { return 21 }
 func IMPORT(): int32 { return 22 }
+func IMPORTC(): int32 { return 75 }
 func BREAK(): int32 { return 23 }
 func CONTINUE(): int32 { return 24 }
 func TRUE(): int32 { return 25 }

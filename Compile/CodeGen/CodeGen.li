@@ -71,6 +71,7 @@ func check_stmt_constants(name: str): bool {
     if (str_eq(name, "STMT_STRUCT")) { return true }
     if (str_eq(name, "STMT_ENUM")) { return true }
     if (str_eq(name, "STMT_IMPORT")) { return true }
+    if (str_eq(name, "STMT_IMPORTC")) { return true }
     if (str_eq(name, "STMT_RETURN")) { return true }
     if (str_eq(name, "STMT_SWITCH")) { return true }
     if (str_eq(name, "STMT_CASE")) { return true }
@@ -110,6 +111,7 @@ func get_stmt_constant_values(name: str): str {
     if (str_eq(name, "STMT_STRUCT")) { return "16" }
     if (str_eq(name, "STMT_ENUM")) { return "17" }
     if (str_eq(name, "STMT_IMPORT")) { return "18" }
+    if (str_eq(name, "STMT_IMPORTC")) { return "26" }
     if (str_eq(name, "STMT_RETURN")) { return "19" }
     if (str_eq(name, "STMT_SWITCH")) { return "20" }
     if (str_eq(name, "STMT_CASE")) { return "21" }

@@ -88,8 +88,30 @@ func Parser_parse_primary(p: Parser): ASTNode {
                 return n
             }
         }
-        // It's a variable
+        // It's a variable or function name
         Parser_advance(p)
+        
+        // Check for generic type parameters: func_name<T1, T2>
+        if (Parser_check(p, LESS())) {
+            Parser_advance(p)  // consume '<'
+            let full_name: str = lexeme + "<"
+            let first: bool = true
+            while (true) {
+                if (!first) {
+                    full_name = full_name + ", "
+                }
+                first = false
+                let type_arg: str = Parser_parse_type(p)
+                full_name = full_name + type_arg
+                if (!Parser_match(p, COMMA())) { break }
+            }
+            Parser_consume(p, GREATER(), "Expected '>' after generic type arguments")
+            full_name = full_name + ">"
+            let n: ASTNode = AST_node_new(EXPR_VARIABLE(), token_line(tok), token_col(tok))
+            n.name = full_name
+            return n
+        }
+        
         let n: ASTNode = AST_node_new(EXPR_VARIABLE(), token_line(tok), token_col(tok))
         n.name = lexeme
         return n
@@ -655,6 +677,13 @@ func Parser_parse_program(p: Parser): any {
             let path: any = Parser_consume(p, STRING(), "Expected import path")
             let node: ASTNode = AST_node_new(STMT_IMPORT(), token_line(path), token_col(path))
             node.value = token_lexeme(path)
+            ptr_array_append(stmts, node)
+        }
+        else if (Parser_match(p, IMPORTC())) {
+            let header: any = Parser_consume(p, STRING(), "Expected C header path")
+            let node: ASTNode = AST_node_new(STMT_IMPORTC(), token_line(header), token_col(header))
+            node.value = token_lexeme(header)
+            node.is_unsafe = is_unsafe
             ptr_array_append(stmts, node)
         }
         else if (Parser_match(p, FUNC())) {

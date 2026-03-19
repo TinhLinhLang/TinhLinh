@@ -170,6 +170,7 @@ func check_type_keywords(text: str): int32 {
     if (str_eq(text, "enum")) { return ENUM() }
     if (str_eq(text, "export")) { return EXPORT() }
     if (str_eq(text, "import")) { return IMPORT() }
+    if (str_eq(text, "importC")) { return IMPORTC() }
     return 0
 }
 
